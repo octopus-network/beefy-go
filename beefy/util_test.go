@@ -1,133 +1,44 @@
 package beefy_test
 
 import (
-	"log"
+	"strings"
 	"testing"
 
-	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/xxhash"
-	
-	"github.com/stretchr/testify/require"
-	util "github.com/octopus-network/beefy-go"
+	"github.com/dablelv/go-huge-util/conv"
 )
 
-const PARA_ID uint32 = 2087
-const RPC_CLIENT_ADDRESS = "wss://rococo-rpc.polkadot.io"
+// local testnet
+const LOCAL_RELAY_ENDPPOIT = "ws://127.0.0.1:9944"
+const LOCAL_PARACHAIN_ENDPOINT = "ws://127.0.0.1:9988"
+const LOCAL_PARACHAIN_ID uint32 = 2222
 
+// Rococo testnet
+const ROCOCO_ENDPOIN = "wss://rococo-rpc.polkadot.io"
 
-func TestValidatorSetCodec(t *testing.T) {
+// Rockmine
+const ROCOCO_ROCKMIN_ID uint32 = 1000
+const ROCOCO_ROCKMIN_ENDPOINT = "wss://rococo-rockmine-rpc.polkadot.io"
 
-	var validatorSet1 = types.BeefyNextAuthoritySet{
-		ID:   6222,
-		Len:  83,
-		Root: [32]byte{242, 71, 234, 49, 93, 55, 186, 220, 142, 244, 51, 94, 85, 241, 146, 62, 213, 162, 250, 37, 110, 101, 244, 99, 128, 6, 194, 124, 44, 64, 44, 140},
-	}
-	encodeData, err := codec.Encode(validatorSet1)
-	require.NoError(t, err)
-	log.Printf("encoded validatorSet : %#v\n", codec.HexEncodeToString(encodeData[:]))
+// Polkadot mainnet
+const POLKADOT_ENDPOINT = "wss://rpc.polkadot.io"
 
-	var validatorSet2 types.BeefyNextAuthoritySet
+// Astar
+const POLKADOT_ASTAR_ID uint32 = 2006
+const POLKADOT_ASTAR_ENDPOINT = "wss://rpc.astar.network"
 
-	err = codec.Decode(encodeData, &validatorSet2)
+// Composable Finance
+const POLKADOT_COMPOSABLE_ID uint32 = 2019
+const POLKADOT_COMPOSABLE_ENDPOINT = "wss://rpc.composable.finance"
 
-	if err != nil {
-		log.Printf("decode err: %#s\n", err)
-	}
-	log.Printf("decoded validatorSet: %#v\n", validatorSet2)
+func TestConvSlice(t *testing.T) {
+	value1 := "115 237 235 146 229 61 38 28 11 196 73 222 20 195 104 74 162 139 133 37 211 117 41 203 7 158 175 254 181 101 87 22 116 217 39 159 111 214 185 199 85 80 62 166 217 178 36 218 53 83 37 138 100 7 169 18 128 57 23 178 111 191 27 245 1"
+	convValue1 := conv.SplitStrToSlice[byte](value1, " ")
+	t.Logf("Split str to uint slice: %v", convValue1)
+	value2 := "190, 171, 181, 52, 208, 35, 61, 63, 243, 167, 41, 72, 146, 79, 19, 208, 223,177, 46, 195, 87, 235, 1, 167, 227, 185, 178, 150, 73, 165, 92, 75"
+	t.Logf("Raw value: %v", value2)
+	replacedStr := strings.ReplaceAll(value2, ", ", ",")
+	t.Logf("replaced value: %v", replacedStr)
+	convValue2 := conv.SplitStrToSlice[byte](replacedStr, ",")
+	t.Logf("Split str to uint slice: %v", convValue2)
 
-}
-
-func TestQueryStorage(t *testing.T) {
-	relayApi, err := gsrpc.NewSubstrateAPI(RPC_CLIENT_ADDRESS)
-	require.NoError(t, err)
-
-	var startBlockNumber = 3707562
-	log.Printf("startBlockNumber: %d", startBlockNumber)
-	log.Printf("startBlockNumber+1: %d", startBlockNumber+1)
-	startFinalizedHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(startBlockNumber + 1))
-	require.NoError(t, err)
-	log.Printf("startFinalizedHash: %s\n", codec.HexEncodeToString(startFinalizedHash[:]))
-
-	var endBlockNumber = 3707570
-	log.Printf("endBlockNumber: %d", endBlockNumber)
-	endFinalizedHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(endBlockNumber))
-	require.NoError(t, err)
-	log.Printf("endBlockNumber: %s\n", codec.HexEncodeToString(endFinalizedHash[:]))
-
-	var paraHeaderKeys []types.StorageKey
-
-	// create full storage key for our own paraId
-	keyPrefix := util.CreateStorageKeyPrefix("Paras", "Heads")
-	log.Printf("keyPrefix: %s", codec.HexEncodeToString(keyPrefix[:]))
-	// so we can query all blocks from lastfinalized to latestBeefyHeight
-	log.Printf("PARA_ID: %d", PARA_ID)
-	encodedParaID, err := codec.Encode(PARA_ID)
-	log.Printf("encodedParaID: %s", codec.HexEncodeToString(encodedParaID[:]))
-	require.NoError(t, err)
-
-	twoXHash := xxhash.New64(encodedParaID).Sum(nil)
-	log.Printf("encodedParaID twoXHash: %s", codec.HexEncodeToString(twoXHash[:]))
-	// full key path in the storage source: https://www.shawntabrizi.com/assets/presentations/substrate-storage-deep-dive.pdf
-	// xx128("Paras") + xx128("Heads") + xx64(Encode(paraId)) + Encode(paraId)
-	fullKey := append(append(keyPrefix, twoXHash[:]...), encodedParaID...)
-	log.Printf("fullKey: %s", codec.HexEncodeToString(fullKey[:]))
-	paraHeaderKeys = append(paraHeaderKeys, fullKey)
-
-	changeSet, err := relayApi.RPC.State.QueryStorage(paraHeaderKeys, startFinalizedHash, endFinalizedHash)
-	require.NoError(t, err)
-	log.Printf("changeSet: %#v", changeSet)
-}
-
-func TestQueryStorageAt(t *testing.T) {
-	relayApi, err := gsrpc.NewSubstrateAPI(RPC_CLIENT_ADDRESS)
-	require.NoError(t, err)
-
-	var startBlockNumber = 3707562
-	log.Printf("startBlockNumber: %d", startBlockNumber)
-	log.Printf("startBlockNumber+1: %d", startBlockNumber+1)
-	startFinalizedHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(startBlockNumber + 1))
-	require.NoError(t, err)
-	log.Printf("startFinalizedHash: %s\n", codec.HexEncodeToString(startFinalizedHash[:]))
-
-	var endBlockNumber = 3707570
-	log.Printf("endBlockNumber: %d", endBlockNumber)
-	endFinalizedHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(endBlockNumber))
-	require.NoError(t, err)
-	log.Printf("endBlockNumber: %s\n", codec.HexEncodeToString(endFinalizedHash[:]))
-
-	var paraHeaderKeys []types.StorageKey
-
-	// create full storage key for our own paraId
-	keyPrefix := util.CreateStorageKeyPrefix("Paras", "Heads")
-	log.Printf("keyPrefix: %s", codec.HexEncodeToString(keyPrefix[:]))
-	// so we can query all blocks from lastfinalized to latestBeefyHeight
-	log.Printf("PARA_ID: %d", PARA_ID)
-	encodedParaID, err := codec.Encode(PARA_ID)
-	log.Printf("encodedParaID: %s", codec.HexEncodeToString(encodedParaID[:]))
-	require.NoError(t, err)
-
-	twoXHash := xxhash.New64(encodedParaID).Sum(nil)
-	log.Printf("encodedParaID twoXHash: %s", codec.HexEncodeToString(twoXHash[:]))
-	// full key path in the storage source: https://www.shawntabrizi.com/assets/presentations/substrate-storage-deep-dive.pdf
-	// xx128("Paras") + xx128("Heads") + xx64(Encode(paraId)) + Encode(paraId)
-	fullKey := append(append(keyPrefix, twoXHash[:]...), encodedParaID...)
-	log.Printf("fullKey: %s", codec.HexEncodeToString(fullKey[:]))
-	paraHeaderKeys = append(paraHeaderKeys, fullKey)
-
-	var changSet []types.StorageChangeSet
-
-	for i := startBlockNumber + 1; i <= endBlockNumber; i++ {
-		blockHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(i))
-		log.Printf("blockHash: %s\n", codec.HexEncodeToString(blockHash[:]))
-		require.NoError(t, err)
-		cs, err := relayApi.RPC.State.QueryStorageAt(paraHeaderKeys, blockHash)
-		require.NoError(t, err)
-		log.Printf("cs: %#v", cs)
-		changSet = append(changSet, cs...)
-		// log.Printf("changeSet: %#v", changeSet)
-
-	}
-	log.Printf("changeSet: %#v", changSet)
 }

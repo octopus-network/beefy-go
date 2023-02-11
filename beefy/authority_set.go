@@ -22,6 +22,7 @@ type BeefyAuthoritySet struct {
 	Len uint32
 	// Merkle Root Hash build from BEEFY uncompressed AuthorityIds.
 	Root [32]byte
+	// Root SizedByte32
 }
 
 func GetBeefyAuthorities(blockHash types.Hash, api *gsrpc.SubstrateAPI, method string) ([][]byte, error) {
@@ -101,17 +102,14 @@ func GetBeefyAuthoritySet(blockHash types.Hash, api *gsrpc.SubstrateAPI, method 
 	if !ok {
 		return authoritySet, fmt.Errorf("beefy authority set not found")
 	}
-	log.Printf("BeefyAuthoritySet on chain : %#v\n", authoritySet)
+	log.Printf("BeefyAuthoritySet on chain : %+v\n", authoritySet)
 
 	return authoritySet, nil
 
 }
 
-// create authority proof
-func BuildAuthorityProof(sc types.SignedCommitment, authorityTree merkle.Tree) (ConvertedSignedCommitment, [][]byte, error) {
+func ConvertCommitment(sc types.SignedCommitment) ConvertedSignedCommitment {
 	var sigIdxes []SignatureWithIdx
-	var authorityIndices []uint64
-	// luckily for us, this is already sorted and maps to the right authority index in the authority root.
 	for i, v := range sc.Signatures {
 		if v.IsSome() {
 			_, sig := v.Unwrap()
@@ -119,21 +117,40 @@ func BuildAuthorityProof(sc types.SignedCommitment, authorityTree merkle.Tree) (
 				Signature:      sig[:],
 				AuthorityIndex: uint32(i),
 			})
-			log.Printf("authority signatures: %#v\n", sigIdxes)
-			authorityIndices = append(authorityIndices, uint64(i))
+			log.Printf("authority signatures: %+v", sigIdxes)
+
 		}
 	}
-	authoritiesProof := authorityTree.Proof(authorityIndices).ProofHashes()
 	var csc = ConvertedSignedCommitment{
 		Commitment: sc.Commitment,
 		Signatures: sigIdxes,
 	}
-	log.Printf("authority proofs: %#v\n", authoritiesProof)
-	return csc, authoritiesProof, nil
+	log.Printf("converted commitment: %+v", csc)
+	return csc
+}
+
+// create authority proof
+func BuildAuthorityProofs(authorities [][]byte, authorityIdxes []uint64) (SizedByte32, [][]byte, error) {
+
+	var authorityLeaves [][]byte
+	for _, v := range authorities {
+		authorityLeaves = append(authorityLeaves, crypto.Keccak256(v))
+	}
+	authorityTree, err := merkle.NewTree(hasher.Keccak256Hasher{}).FromLeaves(authorityLeaves)
+	if err != nil {
+		return SizedByte32{}, nil, err
+	}
+	var authorityTreeRoot = Bytes32(authorityTree.Root())
+
+	log.Printf("authorityTreeRoot: %+v", codec.HexEncodeToString(authorityTreeRoot[:]))
+	authoritiesProof := authorityTree.Proof(authorityIdxes).ProofHashes()
+
+	log.Printf("authority proofs: %+v", authoritiesProof)
+	return authorityTreeRoot, authoritiesProof, nil
 }
 
 // verify authority signatures
-func VerifyAuthoritySignatures(csc ConvertedSignedCommitment, bas BeefyAuthoritySet, proofHashes [][]byte, merkleRoot SizedByte32) error {
+func VerifyCommitmentSignatures(csc ConvertedSignedCommitment, totalLeavesCount uint64, merkleRoot SizedByte32, authorityProofs [][]byte) error {
 
 	// beefy authorities are signing the hash of the scale-encoded Commitment
 	commitmentBytes, err := codec.Encode(&csc.Commitment)
@@ -163,15 +180,18 @@ func VerifyAuthoritySignatures(csc ConvertedSignedCommitment, bas BeefyAuthority
 		}
 		authorityLeaves = append(authorityLeaves, authorityLeaf)
 	}
-	authoritiesProof := merkle.NewProof(authorityLeaves, proofHashes, uint64(bas.Len), hasher.Keccak256Hasher{})
-	calMerkleRoot, err := authoritiesProof.RootHex()
+	authoritiesProof := merkle.NewProof(authorityLeaves, authorityProofs, totalLeavesCount, hasher.Keccak256Hasher{})
+	// calMerkleRoot, err := authoritiesProof.RootHex()
+	calMerkleRoot, err := authoritiesProof.Root()
 	if err != nil {
 		return err
 	}
-	log.Printf("cal merkle root: %s\n", calMerkleRoot)
-	log.Printf("expected merkle root: %s\n", codec.HexEncodeToString(merkleRoot[:]))
+	log.Printf("cal merkle root: %#x", calMerkleRoot)
+	// log.Printf("expected merkle root: %s\n", codec.HexEncodeToString(merkleRoot[:]))
+	log.Printf("expected merkle root: %#x", merkleRoot)
 
 	valid, err := authoritiesProof.Verify(merkleRoot[:])
+	log.Printf("verified result : %#v", valid)
 	if err != nil || !valid {
 		return err
 	}

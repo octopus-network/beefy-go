@@ -3,28 +3,20 @@ package beefy_test
 import (
 	"context"
 	"fmt"
-	"log"
 	"testing"
 	"time"
 
-	"github.com/ComposableFi/go-merkle-trees/hasher"
-	"github.com/ComposableFi/go-merkle-trees/merkle"
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-
-	// "github.com/centrifuge/go-substrate-rpc-client/v4/xxhash"
-
-	"github.com/ethereum/go-ethereum/crypto"
+	hug_encoding "github.com/dablelv/go-huge-util/encoding"
+	beefy "github.com/octopus-network/beefy-go/beefy"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 
-	beefy "github.com/octopus-network/beefy-go"
 	"github.com/stretchr/testify/require"
 )
-
-var endpoint = "wss://rococo-rpc.polkadot.io"
 
 func TestBeefyAuthoritySetCodec(t *testing.T) {
 	var validatorSet1 = types.BeefyNextAuthoritySet{
@@ -34,24 +26,28 @@ func TestBeefyAuthoritySetCodec(t *testing.T) {
 	}
 	encodeData, err := codec.Encode(validatorSet1)
 	require.NoError(t, err)
-	log.Printf("encoded validatorSet : %#v\n", codec.HexEncodeToString(encodeData[:]))
+	t.Logf("encoded validatorSet : %+v", codec.HexEncodeToString(encodeData[:]))
 
 	var validatorSet2 types.BeefyNextAuthoritySet
 
 	err = codec.Decode(encodeData, &validatorSet2)
 
 	if err != nil {
-		log.Printf("decode err: %#s\n", err)
+		t.Logf("decode err: %#s\n", err)
 	}
-	log.Printf("decoded validatorSet: %#v\n", validatorSet2)
+	t.Logf("decoded validatorSet: %+v", validatorSet2)
+
+	jsonMsg, err := hug_encoding.ToIndentJSON(validatorSet2)
+	require.NoError(t, err)
+	t.Logf("validatorSet json: %s", jsonMsg)
 
 }
 
-func TestVerifyValidatorProof(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(endpoint)
+func TestVerifyValidatorProofLocal(t *testing.T) {
+	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
 	if err != nil {
 		// fmt.Printf("connection err,%s", err)
-		log.Printf("Connecting err: %v", err)
+		t.Logf("Connecting err: %v", err)
 		// t.Log("Connecting err: %v", err)
 	}
 	ch := make(chan interface{})
@@ -66,11 +62,11 @@ func TestVerifyValidatorProof(t *testing.T) {
 	assert.NoError(t, err)
 	if err != nil && err.Error() == "Method not found" {
 		fmt.Printf("skipping since beefy module is not available")
-		// log.Printf("skipping since beefy module is not available %v", err)
+		// t.Logf("skipping since beefy module is not available %v", err)
 	}
 
 	// fmt.Printf("subscribed to %s\n", polkadot_endpoint)
-	log.Printf("subscribed to %s\n", endpoint)
+	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
 	// assert.NoError(t, err)
 	defer sub.Unsubscribe()
 
@@ -80,7 +76,7 @@ func TestVerifyValidatorProof(t *testing.T) {
 	for {
 		select {
 		case msg := <-ch:
-			log.Printf("encoded msg: %s\n", msg)
+			t.Logf("encoded msg: %s", msg)
 
 			// s := &types.SignedCommitment{}
 			s := &beefy.VersionedFinalityProof{}
@@ -89,36 +85,45 @@ func TestVerifyValidatorProof(t *testing.T) {
 				panic(err)
 			}
 
-			log.Printf("encoded msg: %#v\n", s)
+			t.Logf("decoded msg: %+v", s)
 			blockNumber := s.SignedCommitment.Commitment.BlockNumber
-			log.Printf("blockNumber: %d\n", blockNumber)
+			t.Logf("blockNumber: %d", blockNumber)
 			blockHash, err := api.RPC.Chain.GetBlockHash(uint64(blockNumber))
 			require.NoError(t, err)
-			log.Printf("blockHash: %#v\n", codec.HexEncodeToString(blockHash[:]))
+			t.Logf("blockHash: %+v", codec.HexEncodeToString(blockHash[:]))
+
 			authorities, err := beefy.GetBeefyAuthorities(blockHash, api, "Authorities")
 			require.NoError(t, err)
-			// log.Printf("authorities: %#v\n", authorities)
-			var authorityLeaves [][]byte
-			for _, v := range authorities {
-				authorityLeaves = append(authorityLeaves, crypto.Keccak256(v))
-			}
-			authorityTree, err := merkle.NewTree(hasher.Keccak256Hasher{}).FromLeaves(authorityLeaves)
-			require.NoError(t, err)
-			var authorityTreeRoot = beefy.Bytes32(authorityTree.Root())
-			log.Printf("authorityTreeRoot: %#v\n", codec.HexEncodeToString(authorityTreeRoot[:]))
-			createBeefyAuthoritySet := beefy.BeefyAuthoritySet{
-				Id:            uint64(s.SignedCommitment.Commitment.ValidatorSetID),
-				Len:           uint32(len(authorities)),
-				AuthorityRoot: &authorityTreeRoot,
-			}
-			log.Printf("created authorityTreeRoot: %#v\n", createBeefyAuthoritySet)
+			// t.Logf("authorities: %#v\n", authorities)
+			// var authorityLeaves [][]byte
+			// for _, v := range authorities {
+			// 	authorityLeaves = append(authorityLeaves, crypto.Keccak256(v))
+			// }
+			// authorityTree, err := merkle.NewTree(hasher.Keccak256Hasher{}).FromLeaves(authorityLeaves)
+			// require.NoError(t, err)
+			// var authorityTreeRoot = beefy.Bytes32(authorityTree.Root())
+			// // var authorityTreeRoot = authorityTree.Root()
+			// t.Logf("authorityTreeRoot: %+v", codec.HexEncodeToString(authorityTreeRoot[:]))
+			// currentBeefyAuthoritySet := beefy.BeefyAuthoritySet{
+			// 	Id:   uint64(s.SignedCommitment.Commitment.ValidatorSetID),
+			// 	Len:  uint32(len(authorities)),
+			// 	Root: authorityTreeRoot,
+			// }
+			// t.Logf("created authorityTreeRoot: %+v", currentBeefyAuthoritySet)
+
 			statedBeefyAuthoritySetBytes, err := beefy.GetBeefyAuthoritySet(blockHash, api, "BeefyAuthorities")
 			require.NoError(t, err)
-			log.Printf("statedBeefyAuthoritySetBytes: %#v\n", statedBeefyAuthoritySetBytes)
+			t.Logf("statedBeefyAuthoritySetBytes: %+v", statedBeefyAuthoritySetBytes)
 
-			csc, proofs, err := beefy.CreateAuthorityProof(s.SignedCommitment, authorityTree)
+			csc := beefy.ConvertCommitment(s.SignedCommitment)
+			var authorityIdxes []uint64
+			for _, v := range csc.Signatures {
+				idx := v.AuthorityIndex
+				authorityIdxes = append(authorityIdxes, uint64(idx))
+			}
+			authorityTreeRoot, authorityProofs, err := beefy.BuildAuthorityProofs(authorities, authorityIdxes)
 			require.NoError(t, err)
-			err = beefy.VerifyAuthoritySignatures(csc, createBeefyAuthoritySet, proofs, authorityTreeRoot)
+			err = beefy.VerifyCommitmentSignatures(csc, uint64(statedBeefyAuthoritySetBytes.Len), authorityTreeRoot, authorityProofs)
 			require.NoError(t, err)
 
 			received++
@@ -127,7 +132,7 @@ func TestVerifyValidatorProof(t *testing.T) {
 				return
 			}
 		case <-timeout:
-			log.Printf("timeout reached without getting 2 notifications from subscription")
+			t.Logf("timeout reached without getting 2 notifications from subscription")
 			return
 		}
 	}
