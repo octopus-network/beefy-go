@@ -113,26 +113,27 @@ func GetLeafIndexForBlockNumber(beefyActivationBlock uint32, blockNumber uint32)
 		leafIndex = blockNumber - 1
 	} else {
 		// in this case the leaf index is activation block - current block number.
-		leafIndex = beefyActivationBlock - (blockNumber + 1)
+		// leafIndex = beefyActivationBlock - (blockNumber + 1)
+		leafIndex = (blockNumber + 1) - beefyActivationBlock
 	}
 
 	return uint64(leafIndex)
 }
 
-func BuildMMRProof(conn *gsrpc.SubstrateAPI, leafIndex uint64, blockHash types.Hash) (types.H256, types.MMRLeaf, [][]byte, error) {
+func BuildMMRProof(conn *gsrpc.SubstrateAPI, leafIndex uint64, blockHash types.Hash) (types.H256, types.MMRLeaf, types.MMRProof, error) {
 	resp, err := conn.RPC.MMR.GenerateProof(leafIndex, blockHash)
 	if err != nil {
-		return types.H256{}, types.MMRLeaf{}, nil, err
+		return types.H256{}, types.MMRLeaf{}, types.MMRProof{}, err
 	}
 
-	retBlockHash, mmrLeaf, proof := resp.BlockHash, resp.Leaf, resp.Proof
 	log.Printf("\nLeafIndex:%d\nGenerated MMR Proof: %+v", leafIndex, resp)
+	retBlockHash, mmrLeaf, proof := resp.BlockHash, resp.Leaf, resp.Proof
 	var mmrLeafProof = make([][]byte, len(proof.Items))
 	for i := 0; i < len(proof.Items); i++ {
 		mmrLeafProof[i] = proof.Items[i][:]
 	}
 
-	return retBlockHash, mmrLeaf, mmrLeafProof, nil
+	return retBlockHash, mmrLeaf, proof, nil
 
 }
 

@@ -1,6 +1,7 @@
 package beefy
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -79,6 +80,50 @@ func (d *ReadProofResponse) UnmarshalJSON(bz []byte) error {
 	return nil
 }
 
+func GetStateProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash, storageKeys []string) (ReadProofResponse, error) {
+	var rp ReadProofResponse
+	err := client.CallWithBlockHash(conn.Client, &rp, "state_getReadProof", &blockHash, storageKeys)
+	if err != nil {
+		return rp, err
+	}
+	// log.Printf("read proof: %+v", rp)
+
+	return rp, nil
+}
+
+func GetParaHeaderProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash, paraId uint32) (ReadProofResponse, error) {
+
+	var rp ReadProofResponse
+	// Fetch metadata
+	meta, err := conn.RPC.State.GetMetadataLatest()
+	if err != nil {
+
+		return rp, err
+	}
+	var storageKeys []types.StorageKey
+
+	paraIdEncoded := make([]byte, 4)
+	binary.LittleEndian.PutUint32(paraIdEncoded, paraId)
+	storageKey, err := types.CreateStorageKey(meta, "Paras", "Heads", paraIdEncoded)
+	if err != nil {
+		return rp, err
+	}
+	log.Printf("storageKey: %#x", storageKey)
+	storageKeys = append(storageKeys, storageKey)
+	hexKeys := make([]string, len(storageKeys))
+	for i, key := range storageKeys {
+		hexKeys[i] = key.Hex()
+	}
+	log.Printf("hexKeys: %+v", hexKeys)
+
+	rp, err = GetStateProof(conn, blockHash, hexKeys)
+	if err != nil {
+		return rp, err
+	}
+	return rp, nil
+
+}
+
 func GetTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (ReadProofResponse, error) {
 
 	var rp ReadProofResponse
@@ -101,12 +146,16 @@ func GetTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (ReadProo
 	}
 	log.Printf("hexKeys: %+v", hexKeys)
 
-	err = client.CallWithBlockHash(conn.Client, &rp, "state_getReadProof", &blockHash, hexKeys)
+	// err = client.CallWithBlockHash(conn.Client, &rp, "state_getReadProof", &blockHash, hexKeys)
+	// if err != nil {
+	// 	return rp, err
+	// }
+	// // log.Printf("read proof: %+v", rp)
+
+	rp, err = GetStateProof(conn, blockHash, hexKeys)
 	if err != nil {
 		return rp, err
 	}
-	// log.Printf("read proof: %+v", rp)
-
 	return rp, nil
 
 }
