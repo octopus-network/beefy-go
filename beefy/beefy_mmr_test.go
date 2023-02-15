@@ -16,6 +16,7 @@ import (
 	"github.com/ComposableFi/go-merkle-trees/mmr"
 	merkletypes "github.com/ComposableFi/go-merkle-trees/types"
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/hash"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -253,6 +254,147 @@ func TestBuildAndVerifyMMRProofLocal(t *testing.T) {
 
 }
 
+func TestVerifyBatchProofLocal(t *testing.T) {
+	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	if err != nil {
+		t.Logf("Connecting err: %v", err)
+	}
+	ch := make(chan interface{})
+	sub, err := api.Client.Subscribe(
+		context.Background(),
+		"beefy",
+		"subscribeJustifications",
+		"unsubscribeJustifications",
+		"justifications",
+		ch)
+
+	require.NoError(t, err)
+
+	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
+
+	defer sub.Unsubscribe()
+
+	timeout := time.After(24 * time.Hour)
+	received := 0
+	var preBlockNumber uint32
+	var preBloackHash types.Hash
+	for {
+		select {
+		case msg := <-ch:
+			t.Logf("encoded msg: %s", msg)
+
+			s := &beefy.VersionedFinalityProof{}
+			err := codec.DecodeFromHex(msg.(string), s)
+			if err != nil {
+				panic(err)
+			}
+
+			t.Logf("decoded msg: %+v\n", s)
+			latestSignedCommitmentBlockNumber := s.SignedCommitment.Commitment.BlockNumber
+			// t.Logf("blockNumber: %d\n", latestBlockNumber)
+			latestSignedCommitmentBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(latestSignedCommitmentBlockNumber))
+			require.NoError(t, err)
+			t.Logf("latestSignedCommitmentBlockNumber: %d latestSignedCommitmentBlockHash: %#x", latestSignedCommitmentBlockNumber, latestSignedCommitmentBlockHash)
+
+			if received == 0 {
+				t.Log("First received signed commitment,init client state and need to wait next msg!")
+				preBlockNumber = latestSignedCommitmentBlockNumber
+				preBloackHash = latestSignedCommitmentBlockHash
+				received++
+				continue
+			}
+
+			fromBlockNumber := preBlockNumber + 1
+			t.Logf("fromBlockNumber: %d toBlockNumber: %d", fromBlockNumber, latestSignedCommitmentBlockNumber)
+
+			fromBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(fromBlockNumber))
+			require.NoError(t, err)
+			t.Logf("fromBlockHash: %#x ", fromBlockHash)
+			t.Logf("preSignedCommitmentBloackHash: %#x ", preBloackHash)
+			// t.Logf("toBlockNumber: %d", toBlockNumber)
+			t.Logf("toBlockHash: %#x", latestSignedCommitmentBlockHash)
+
+			changeSets, err := beefy.QueryParaChainStorage(api, LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
+			require.NoError(t, err)
+			t.Logf("changeSet len: %d", len(changeSets))
+			var targetRelayChainBlockHeights []uint64
+			for _, changeSet := range changeSets {
+				header, err := api.RPC.Chain.GetHeader(changeSet.Block)
+				require.NoError(t, err)
+				// t.Logf("fromBlockHash: %#x ", fromFinalizedHash)
+				t.Logf("changeSet blockHash: %d changeSet blockHash: %#x", header.Number, changeSet.Block)
+				hexStr, err := json.Marshal(changeSet.Changes)
+				require.NoError(t, err)
+				t.Logf("changeSet changes: %s", hexStr)
+				for _, change := range changeSet.Changes {
+
+					t.Logf("change.StorageKey: %#x", change.StorageKey)
+					t.Log("change.HasStorageData: ", change.HasStorageData)
+					t.Logf("change.HasStorageData: %#x", change.StorageData)
+				}
+				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint64(header.Number))
+
+			}
+
+			// build mmr proofs for leaves containing target paraId
+			mmrBatchProof, err := beefy.BuildMMRBatchProof(api, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
+			require.NoError(t, err)
+			// t.Logf("mmrBatchProof: %+v", mmrBatchProof)
+			t.Logf("mmrBatchProof.BlockHash: %#x", mmrBatchProof.BlockHash)
+			t.Logf("mmrBatchProof leaves len: %d", len(mmrBatchProof.Leaves))
+			for _, leaf := range mmrBatchProof.Leaves {
+				t.Logf("mmrBatchProof leaf: %+v", leaf)
+			}
+			t.Logf("targetRelayChainBlockHeights: %+v", targetRelayChainBlockHeights)
+			t.Logf("The indexes of the leaf the proof is for: %+v", mmrBatchProof.Proof.LeafIndex)
+			t.Logf("Number of leaves in MMR, when the proof was generated: %d", mmrBatchProof.Proof.LeafCount)
+			// leafCount := mmrBatchProof.Proof.LeafCount
+			// mmrSize := mmr.LeafIndexToMMRSize(uint64(leafCount))
+			leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber)
+			mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
+			t.Logf("beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber): %d", leafIndex)
+			t.Logf("mmr.LeafIndexToMMRSize(uint64(leafIndex)): %d", mmrSize)
+
+			var mmrLeafProof = make([][]byte, len(mmrBatchProof.Proof.Items))
+			for i := 0; i < len(mmrBatchProof.Proof.Items); i++ {
+				mmrLeafProof[i] = mmrBatchProof.Proof.Items[i][:]
+			}
+
+			var mmrLeaves = make([]merkletypes.Leaf, len(mmrBatchProof.Leaves))
+			for i := 0; i < len(mmrBatchProof.Leaves); i++ {
+				// scale encode the mmr leaf
+				encodedMMRLeaf, err := codec.Encode(mmrBatchProof.Leaves[i])
+				require.NoError(t, err)
+				log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
+				mmrLeaf := merkletypes.Leaf{
+					Hash:  crypto.Keccak256(encodedMMRLeaf),
+					Index: uint64(mmrBatchProof.Proof.LeafIndex[i]),
+				}
+				mmrLeaves[i] = mmrLeaf
+			}
+			mmrProof := mmr.NewProof(mmrSize, mmrLeafProof, mmrLeaves, hasher.Keccak256Hasher{})
+			calMMRRoot, err := mmrProof.CalculateRoot()
+			require.NoError(t, err)
+			t.Log("------------------------------------------------------------------------------------")
+			t.Logf("cal mmr root:%#x", calMMRRoot)
+			t.Logf("payload.Data:%#x", s.SignedCommitment.Commitment.Payload[0].Data)
+			t.Log("------------------------------------------------------------------------------------")
+			// save latestSignedCommitment for next verify
+			preBlockNumber = latestSignedCommitmentBlockNumber
+			preBloackHash = latestSignedCommitmentBlockHash
+
+			received++
+
+			if received >= 10 {
+				return
+			}
+		case <-timeout:
+			t.Logf("timeout reached without getting 2 notifications from subscription")
+			return
+		}
+	}
+}
+
 func TestVerifyMMRLocal(t *testing.T) {
 	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
 	if err != nil {
@@ -278,7 +420,8 @@ func TestVerifyMMRLocal(t *testing.T) {
 
 	timeout := time.After(24 * time.Hour)
 	received := 0
-
+	// var preBlockNumber uint32
+	// var preBloackHash types.Hash
 	for {
 		select {
 		case msg := <-ch:
@@ -297,93 +440,169 @@ func TestVerifyMMRLocal(t *testing.T) {
 			require.NoError(t, err)
 			t.Logf("singedCommitmentblockNumber: %d singedCommitmentBlockHash: %#x", singedCommitmentblockNumber, singedCommitmentBlockHash)
 
-			//target blocknumber
-			targetBlockNumber := singedCommitmentblockNumber - 5
-			// leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), singedCommitmentblockNumber)
-			leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), targetBlockNumber)
+			// if received == 0 {
+			// 	t.Log("First received signed commitment,init client state and need to wait next msg!")
+			// 	preBlockNumber = singedCommitmentblockNumber
+			// 	preBloackHash = singedCommitmentBlockHash
+			// 	received++
+			// 	continue
+			// }
+			for targetHeight := uint64(singedCommitmentblockNumber); uint64(singedCommitmentblockNumber-2) < targetHeight; targetHeight-- {
+				//target blocknumber
+				// targetHeight := uint64(singedCommitmentblockNumber - 2)
+				// targetHeight := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), singedCommitmentblockNumber)
+				// leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), singedCommitmentblockNumber)
+				// leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), targetBlockNumber)
+				// leafIndex := uint64(targetHeight)
+				// t.Logf("mmrSize:%d\n ", mmrSize)
+				// generate mmr proof for target height
+				retHash, mmrLeaf, proof, err := beefy.BuildMMRProof(api, targetHeight-1, singedCommitmentBlockHash)
+				// Note: get the mmr proof for target block number,must input target block number ,do not input LeafIndex
+				// retHash, mmrLeaf, proof, err := beefy.BuildMMRProof(api, uint64(targetBlockNumber), singedCommitmentBlockHash)
 
-			// t.Logf("mmrSize:%d\n ", mmrSize)
-			// retHash, mmrLeaf, proof, err := beefy.BuildMMRProof(api, leafIndex, blockHash)
-			// Note: get the mmr proof for target block number,must input target block number ,do not input LeafIndex
-			retHash, mmrLeaf, proof, err := beefy.BuildMMRProof(api, uint64(targetBlockNumber), singedCommitmentBlockHash)
+				// leafCount := uint64(proof.LeafCount)
+				leafIndex := uint64(proof.LeafIndex)
+				mmrSize := mmr.LeafIndexToMMRSize(targetHeight - 1)
+				t.Logf("singedCommitmentblockNumber: %d targetHeight: %d proof.LeafIndex: %d mmrSize: %d", singedCommitmentblockNumber, targetHeight, proof.LeafIndex, mmrSize)
+				// parachainHeadsMerkleRoot := mmrLeaf.ParachainHeads
+				// mmrSize1 := mmr.LeafIndexToMMRSize(leafIndex)
+				// mmrSize2 := mmr.LeafIndexToMMRSize(leafCount)
 
-			leafCount := proof.LeafCount
-			parachainHeadsMerkleRoot := mmrLeaf.ParachainHeads
-			mmrSize1 := mmr.LeafIndexToMMRSize(leafIndex)
-			mmrSize2 := mmr.LeafIndexToMMRSize(uint64(leafCount))
-
-			var mmrLeafProof = make([][]byte, len(proof.Items))
-			for i := 0; i < len(proof.Items); i++ {
-				mmrLeafProof[i] = proof.Items[i][:]
-			}
-
-			t.Logf("singedCommitmentblockNumber:%d targetBlockNumber:%d leafIndex:%d proof.LeafIndex:%d leafCount:%d mmrSize1:%d mmrSize2:%d",
-				singedCommitmentblockNumber, targetBlockNumber, leafIndex, proof.LeafIndex, leafCount, mmrSize1, mmrSize2)
-			require.NoError(t, err)
-			t.Logf("\nrethash: %#x\nmmrLeaf: %+v\nmmrLeafProof: %+v", retHash, mmrLeaf, mmrLeafProof)
-
-			// result1, err := beefy.VerifyMMRProof(s.SignedCommitment, mmrSize1, leafIndex, mmrLeaf, mmrLeafProof)
-			// require.NoError(t, err)
-			// t.Logf("verify mmr proof result: %#v", result1)
-
-			result2, err := beefy.VerifyMMRProof(s.SignedCommitment, mmrSize2, leafIndex, mmrLeaf, mmrLeafProof)
-			require.NoError(t, err)
-			t.Logf("verify mmr proof result: %#v", result2)
-
-			// verify parachain header
-			// get target block hash
-			targetBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(targetBlockNumber))
-			require.NoError(t, err)
-			t.Logf("targetBlockNumber: %d targetBlockHash: %#x", targetBlockNumber, targetBlockHash)
-			paraChainIds, err := beefy.GetParaChainIDs(api, targetBlockHash)
-			require.NoError(t, err)
-			t.Logf("paraChainIds: %+v", paraChainIds)
-			var paraChainHeaderMap = make(map[uint32][]byte, len(paraChainIds))
-			for _, paraChainId := range paraChainIds {
-				paraChainHeader, err := beefy.GetParaChainHeader(api, uint32(paraChainId), targetBlockHash)
-				require.NoError(t, err)
-				// t.Logf("paraChainId: %d", paraChainId)
-				t.Logf("paraChainId: %d paraChainHeader: %#x", paraChainId, paraChainHeader)
-				paraChainHeaderMap[paraChainId] = paraChainHeader
-			}
-			t.Logf("paraChainHeaderMap: %+v", paraChainHeaderMap)
-			// sort by paraId
-			var sortedParaIds []uint32
-			for paraId := range paraChainHeaderMap {
-				sortedParaIds = append(sortedParaIds, paraId)
-			}
-			sort.SliceStable(sortedParaIds, func(i, j int) bool {
-				return sortedParaIds[i] < sortedParaIds[j]
-			})
-			t.Logf("sortedParaIds: %+v", sortedParaIds)
-
-			var paraHeaderLeaves [][]byte
-			var targetParaHeaderindex uint32
-			var targetParaId uint32 = 2222
-			count := 0
-			for _, paraId := range sortedParaIds {
-				encodedParaHeader, err := codec.Encode(beefy.ParaIdAndHeader{ParaId: paraId, Header: paraChainHeaderMap[paraId]})
-				require.NoError(t, err)
-				// get paraheader hash
-				paraHeaderLeaf := crypto.Keccak256(encodedParaHeader)
-				paraHeaderLeaves = append(paraHeaderLeaves, paraHeaderLeaf)
-				if paraId == targetParaId {
-					// find the index of targent para chain id
-					targetParaHeaderindex = uint32(count)
-					log.Printf("targetParaHeaderindex: %d", targetParaHeaderindex)
+				var mmrLeafProofItems = make([][]byte, len(proof.Items))
+				for i := 0; i < len(proof.Items); i++ {
+					mmrLeafProofItems[i] = proof.Items[i][:]
 				}
-				count++
+
+				// t.Logf("singedCommitmentblockNumber:%d targetHeight:%d  proof.LeafIndex:%d proof.LeafCount:%d mmr.LeafIndexToMMRSize(leafIndex):%d mmr.LeafIndexToMMRSize(leafCount):%d mmrSize3 := mmr.LeafIndexToMMRSize(targetHeight):%d",
+				// 	singedCommitmentblockNumber, targetHeight, proof.LeafIndex, leafCount, mmrSize1, mmrSize2, mmrSize3)
+				require.NoError(t, err)
+				t.Logf("\nrethash: %#x\nmmrLeaf: %+v\nmmrLeafProofItems: %+v", retHash, mmrLeaf, mmrLeafProofItems)
+
+				// t.Log("------------------------------------------------------------------------------------")
+				// t.Log("beefy.VerifyMMRProof(s.SignedCommitment, mmrSize1, leafIndex, mmrLeaf, mmrLeafProof)")
+				// result1, err := beefy.VerifyMMRProof(s.SignedCommitment, mmrSize1, leafIndex, mmrLeaf, mmrLeafProof)
+				// require.NoError(t, err)
+				// require.True(t, result1)
+
+				// // t.Logf("verify mmr proof result1: %#v", result1)
+				// t.Log("------------------------------------------------------------------------------------")
+				// t.Log("beefy.VerifyMMRProof(s.SignedCommitment, mmrSize2, leafIndex, mmrLeaf, mmrLeafProof)")
+				// result2, err := beefy.VerifyMMRProof(s.SignedCommitment, mmrSize2, leafIndex, mmrLeaf, mmrLeafProof)
+				// require.NoError(t, err)
+				// require.True(t, result2)
+
+				// t.Logf("verify mmr proof result2: %#v", result2)
+				// t.Log("------------------------------------------------------------------------------------")
+				// t.Log("beefy.VerifyMMRProof(s.SignedCommitment, mmrSize3, leafIndex, mmrLeaf, mmrLeafProof)")
+				t.Log("------------------------------------------------------------------------------------")
+				result3, err := beefy.VerifyMMRProof(s.SignedCommitment, mmrSize, leafIndex, mmrLeaf, mmrLeafProofItems)
+				t.Log("------------------------------------------------------------------------------------")
+				require.NoError(t, err)
+				require.True(t, result3)
+
+				// t.Logf("verify mmr proof result3: %#v", result3)
+				// t.Log("------------------------------------------------------------------------------------")
+				// t.Log("beefy.VerifyMMRProof(s.SignedCommitment, mmrSize4, leafIndex, mmrLeaf, mmrLeafProof)")
+				// result4, err := beefy.VerifyMMRProof(s.SignedCommitment, mmrSize3, targetHeight, mmrLeaf, mmrLeafProof)
+				// require.NoError(t, err)
+				// require.True(t, result4)
+
+				// verify parachain header
+				// get target block hash
+				leafBlockHash, err := api.RPC.Chain.GetBlockHash(leafIndex)
+				require.NoError(t, err)
+				t.Logf("leafBlockNumber: %d leafBlockHash: %#x", leafIndex, leafBlockHash)
+				paraChainIds, err := beefy.GetParaChainIDs(api, leafBlockHash)
+				require.NoError(t, err)
+				t.Logf("paraChainIds: %+v", paraChainIds)
+				var paraChainHeaderMap = make(map[uint32][]byte, len(paraChainIds))
+				for _, paraChainId := range paraChainIds {
+					paraChainHeader, err := beefy.GetParaChainHeader(api, uint32(paraChainId), leafBlockHash)
+					require.NoError(t, err)
+					// t.Logf("paraChainId: %d", paraChainId)
+					t.Logf("paraChainId: %d paraChainHeader: %#x", paraChainId, paraChainHeader)
+					paraChainHeaderMap[paraChainId] = paraChainHeader
+				}
+				t.Logf("paraChainHeaderMap: %+v", paraChainHeaderMap)
+				// sort by paraId
+				var sortedParaIds []uint32
+				for paraId := range paraChainHeaderMap {
+					sortedParaIds = append(sortedParaIds, paraId)
+				}
+				sort.SliceStable(sortedParaIds, func(i, j int) bool {
+					return sortedParaIds[i] < sortedParaIds[j]
+				})
+				t.Logf("sortedParaIds: %+v", sortedParaIds)
+
+				var paraHeaderLeaves [][]byte
+				var targetParaHeaderindex uint32
+				var targetParaId uint32 = 2222
+				count := 0
+				for _, paraId := range sortedParaIds {
+					encodedParaHeader, err := codec.Encode(beefy.ParaIdAndHeader{ParaId: paraId, Header: paraChainHeaderMap[paraId]})
+					require.NoError(t, err)
+					// get paraheader hash
+					paraHeaderLeaf := crypto.Keccak256(encodedParaHeader)
+					paraHeaderLeaves = append(paraHeaderLeaves, paraHeaderLeaf)
+					if paraId == targetParaId {
+						// find the index of targent para chain id
+						targetParaHeaderindex = uint32(count)
+						log.Printf("targetParaHeaderindex: %d", targetParaHeaderindex)
+					}
+					count++
+				}
+				log.Printf("paraHeadsLeaves: %+v", paraHeaderLeaves)
+				// build merkle tree from all the paraheader leaves
+				tree, err := merkle.NewTree(hasher.Keccak256Hasher{}).FromLeaves(paraHeaderLeaves)
+				require.NoError(t, err)
+
+				parachainHeadsMerkleRoot := mmrLeaf.ParachainHeads
+				t.Log("------------------------------------------------------------------------------------")
+				t.Logf("cal paraHeaders merkle tree root: %#x", tree.Root())
+				t.Logf("parachainHeadsMerkleRoot from mmrLeaf: %#x", parachainHeadsMerkleRoot)
+				t.Log("------------------------------------------------------------------------------------")
+
+				// check target blockhash == mmrLeaf.
+				targetRelayerBlockHash, err := api.RPC.Chain.GetBlockHash(targetHeight)
+				require.NoError(t, err)
+				targetRelayHeader, err := api.RPC.Chain.GetHeader(targetRelayerBlockHash)
+				require.NoError(t, err)
+				t.Logf("\targetHeight: %d targetRelayerBlockHash: %#x\n targetRelayHeader: %+v", targetHeight, targetRelayerBlockHash, targetRelayHeader)
+
+				t.Logf("\ntargetRelayerBlockHash: %#x", targetRelayerBlockHash)
+				t.Logf("targetRelayerHeader.ParentHash: %#x", targetRelayHeader.ParentHash)
+				t.Logf("mmrLeaf ParentNumber: %d, mmrLeaf parent Hash: %#x", mmrLeaf.ParentNumberAndHash.ParentNumber, mmrLeaf.ParentNumberAndHash.Hash)
+
+				encodeTargetRelayerHeader, err := codec.Encode(targetRelayHeader)
+				require.NoError(t, err)
+				// targetRelayHeaderRehash, err := hasher.Keccak256Hasher{}.Hash(encodeTargetRelayerHeader)
+				blake2b256, err := hash.NewBlake2b256(nil)
+				require.NoError(t, err)
+				_, err = blake2b256.Write(encodeTargetRelayerHeader)
+				targetRelayHeaderRehash := blake2b256.Sum(nil)
+				require.NoError(t, err)
+				t.Logf("targetRelayHeaderRehash: %#x", targetRelayHeaderRehash)
+
+				leafHeader, err := api.RPC.Chain.GetHeader(leafBlockHash)
+				require.NoError(t, err)
+				t.Logf("leafHeader: %+v", leafHeader)
+
+				ecodedLeafHeader, err := codec.Encode(leafHeader)
+				require.NoError(t, err)
+				// targetRelayHeaderRehash, err := hasher.Keccak256Hasher{}.Hash(encodeTargetRelayerHeader)
+				blake2b256, err = hash.NewBlake2b256(nil)
+				require.NoError(t, err)
+				_, err = blake2b256.Write(ecodedLeafHeader)
+				leafHeaderRehash := blake2b256.Sum(nil)
+				require.NoError(t, err)
+				t.Logf("leafHeaderRehash: %#x", leafHeaderRehash)
+				t.Logf("\nleafIndex: %d mmrLeaf ParentNumber: %d leafBlockHash: %#x\n mmrLeaf parent Hash: %#x\n leafHeader: %+v", leafIndex, mmrLeaf.ParentNumberAndHash.ParentNumber, leafBlockHash, mmrLeaf.ParentNumberAndHash.Hash, leafHeader)
+
 			}
-			log.Printf("paraHeadsLeaves: %+v", paraHeaderLeaves)
-			// build merkle tree from all the paraheader leaves
-			tree, err := merkle.NewTree(hasher.Keccak256Hasher{}).FromLeaves(paraHeaderLeaves)
-			require.NoError(t, err)
-			// parachainHeadsMerkleRoot := mmrLeaf.ParachainHeads
-			t.Logf("cal paraHeaders merkle tree root: %#x", tree.Root())
-			t.Logf("parachainHeadsMerkleRoot from mmrLeaf: %#x", parachainHeadsMerkleRoot)
+
 			received++
 
-			if received >= 10 {
+			if received >= 2 {
 				return
 			}
 		case <-timeout:
@@ -485,10 +704,16 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			// It`s possobile there is not parachain header at target height
 			require.NoError(t, err)
 			t.Logf("targetBlockHash: %#x\n targetParaHeader: %#x", targetBlockHash, targetEncodedParaHeader)
+			// decode header
 			var targetDecodedParaHeader types.Header
 			err = codec.Decode(targetEncodedParaHeader, &targetDecodedParaHeader)
 			require.NoError(t, err)
 			t.Logf("targetEncodedParaHeader: %+v", targetDecodedParaHeader)
+
+			// encode header by substrate.Marshal
+			// marShalTargetParaHeader, err := trie_scale.Marshal(targetDecodedParaHeader)
+			// require.NoError(t, err)
+			// t.Logf("marShalTargetParaHeader: %#x", marShalTargetParaHeader)
 
 			// get parachain state proof at target height
 			targetParaHeaderStateProof, err := beefy.GetParaHeaderProof(relayApi, targetBlockHash, LOCAL_PARACHAIN_ID)
@@ -510,17 +735,23 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			targetParaHeaderKey, err := types.CreateStorageKey(meta, "Paras", "Heads", paraIdEncoded)
 			require.NoError(t, err)
 			log.Printf("targetParaHeaderKey: %#x", targetParaHeaderKey)
+			// find the parachain header
 			paraHeaderValue := relayerHeaderStateTrieProof.Get(targetParaHeaderKey)
 			require.NotEmpty(t, paraHeaderValue)
 			t.Logf("The targetParaHeader value from trie proof: %#x", paraHeaderValue)
 			// decode the target para chain header
-			// var targetParaHeader types.Header
-			// err = trie_scale.Unmarshal(value, &targetParaHeader)
+			// var targetParaHeader = substrate.NewEmptyHeader()
+			// err = trie_scale.Unmarshal(paraHeaderValue, &targetParaHeader)
 			// require.NoError(t, err)
 			// t.Logf("targetParaHeader: %+v", targetParaHeader)
-			err = trie_proof.Verify(paraHeaderStateproofs, targetRelayerHeader.StateRoot[:], targetParaHeaderKey, paraHeaderValue)
-			require.NoError(t, err)
 
+			// err = trie_proof.Verify(paraHeaderStateproofs, targetRelayerHeader.StateRoot[:], targetParaHeaderKey, paraHeaderValue)
+			marShalTargetParaHeader, err := trie_scale.Marshal(targetEncodedParaHeader)
+			require.NoError(t, err)
+			t.Logf("marShalTargetParaHeader: %#x", marShalTargetParaHeader)
+			err = trie_proof.Verify(paraHeaderStateproofs, targetRelayerHeader.StateRoot[:], targetParaHeaderKey, marShalTargetParaHeader)
+			require.NoError(t, err)
+			t.Log("trie_proof.Verify(paraHeaderStateproofs, targetRelayerHeader.StateRoot[:], targetParaHeaderKey, marShalTargetParaHeader) successlly!")
 			//verify testing
 			targetParaHeaderTrie := trie.NewEmptyTrie()
 			database, err := chaindb.NewBadgerDB(&chaindb.Config{
@@ -548,8 +779,8 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			t.Logf("paraTimestampStoragekey: %#x", paraTimestampStoragekey)
 			timestamp, err := beefy.GetParaChainTimestamp(paraChainApi, paraChainBlockHash)
 			require.NoError(t, err)
-			t.Logf("timestamp from parachain: %#x", timestamp)
-			t.Logf("timestamp from parachain: %d", timestamp)
+			// t.Logf("timestamp from parachain: ", timestamp)
+			t.Logf("timestamp from parachain: %d hex: %x", timestamp, timestamp)
 			time_str := time.UnixMilli(int64(timestamp))
 			t.Logf("timestamp from parachain: %s", time_str)
 
@@ -574,13 +805,15 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			require.NoError(t, err)
 
 			timestampValue := timestampTrieProof.Get(paraTimestampStoragekey)
-			t.Logf("the timestamp in the tire proof: %#x", timestampValue)
+			t.Logf("the timestamp in the tire proof: %x", timestampValue)
 			var timestamp2 uint64
 			err = trie_scale.Unmarshal(timestampValue, &timestamp2)
 			if err != nil {
 				panic(err)
 			}
-			t.Logf("cal timestamp from trie proof: %d\n", timestamp2)
+			marshalTimestamp, err := trie_scale.Marshal(timestamp)
+			require.NoError(t, err)
+			t.Logf("cal timestamp from trie proof: %d hex: %x trie_scale.Marshal(timestamp): %+v", timestamp2, timestamp2, marshalTimestamp)
 			// time_str := time.UnixMicro(int64(timestamp))
 			time_str2 := time.UnixMilli(int64(timestamp2))
 			// time_str := time.Unix(int64(timestamp), 0)
@@ -600,6 +833,9 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			t.Logf("cal parachain state root from new trie tree: %s", calParaHeaderStateRoot)
 			t.Logf("targetDecodeParaHeader.StateRoot: %#x", targetDecodedParaHeader.StateRoot)
 
+			err = trie_proof.Verify(proofs, targetDecodedParaHeader.StateRoot[:], paraTimestampStoragekey, marshalTimestamp)
+			require.NoError(t, err)
+			t.Log("trie_proof.Verify(proofs, targetDecodedParaHeader.StateRoot[:], paraTimestampStoragekey, marshalTimestamp) successlly!")
 			t.Log("--- End to verify para chain data --- \n")
 
 			received++
@@ -611,5 +847,4 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			return
 		}
 	}
-
 }

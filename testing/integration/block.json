@@ -1,0 +1,113 @@
+{
+  block: {
+    header: {
+      parentHash: 0xf8a51b1d6281ed8271a3faf06f2dacafcf3d66ece88b6bf895e1030c0d65f1a4
+      number: 18,500
+      stateRoot: 0x2aaa2c5dd79b7591e0d67a0bb52835d504005e3c501e50d58b4bc5a2fe41bb30
+      extrinsicsRoot: 0x4d43c47c78a60400c4e06b43dae15892256d824f9c642a1d4737615c519bd95e
+      digest: {
+        logs: [
+          {
+            PreRuntime: [
+              BABE
+              0x01020000006201a710000000006a29ac3667de27860924172dbb51dfe3a875fa1a9a101eb4dafb5739319091604879d60ab8acf418cd663f91fab42a3336aeccc12bffe08cddd7a060021a910277b500300e578f11d86e96896bf08e7db4c744125948db8144913f837ed02106
+            ]
+          }
+          {
+            Consensus: [
+              BEEF
+              0x03985d9e1f0851316cd18cd99a05d4d6efa9169a9016a1913f91be400f4955f4da
+            ]
+          }
+          {
+            Seal: [
+              BABE
+              0x9665bac0db036568dd153b7790219a0433ff071d331005b3a8361a639efeb8241bfb14905e7398fd93ffd4c4568af0d55f29b9020f45863d7e2bb6aa875c0587
+            ]
+          }
+        ]
+      }
+    }
+    extrinsics: [
+      {
+        isSigned: false
+        method: {
+          args: {
+            now: 1,676,281,932,004
+          }
+          method: set
+          section: timestamp
+        }
+      }
+      {
+        isSigned: false
+        method: {
+          args: {
+            data: {
+              bitfields: [
+                {
+                  payload: 0b00000000
+                  validatorIndex: 0
+                  signature: 0x486966d5dfbee5b371dcf74efc9184a3d06fc608bd98b5a58ff1e8869fb63e65b9144a815b4c8d766d9e2b5a9c8a371b61525f23041e5d03febb655ed3bf278a
+                }
+                {
+                  payload: 0b00000000
+                  validatorIndex: 1
+                  signature: 0xe4746c3dc3e92a01658aab0912e7767dd50d4e5e6bd4fb5a7d18493e0f5e39797b783a047d847198cc9021fa6866781da06a48c26e130322a522c4b19626d985
+                }
+                {
+                  payload: 0b00000000
+                  validatorIndex: 2
+                  signature: 0x220d60c36f1e17b3b89ec25ce1ee3ec43416a32462765e0bd030d742d4c69a3bd773ca2922f987f00da44799faa39daf35bd0ee69193624886c5d5c36b3ffd82
+                }
+                {
+                  payload: 0b00000000
+                  validatorIndex: 3
+                  signature: 0xf2cc40a23f2aea92469806093e21761220a4d0ac34fe3c5b2bbc9d17e350bd450cfafc20a1de3d054a3349ce009a958f5ca33173be31c717dc3f7951bcd6ef8f
+                }
+                {
+                  payload: 0b00000000
+                  validatorIndex: 4
+                  signature: 0x3e18a1a9d2a48f865aa6af1bd5825fa165de23b07419e341d79cebdb964add707077875f9291b75f9e704ea85505a5e901b7107c4d53a169eb891e6d2cc31488
+                }
+              ]
+              backedCandidates: []
+              disputes: []
+              parentHeader: {
+                parentHash: 0x0e54e1ccb935114cd0f786bd9a3232389af8e752f6f1d8b428082f947f6c0bb5
+                number: 18,499
+                stateRoot: 0x89eb1797551f6e27ef0eb17b5c05d8303c26faa046ba965e6cfb3dcb5587d096
+                extrinsicsRoot: 0xa0d70ff9ea45a865249b9ce861d67b18416b0bde74674e81844dd5dfac68989c
+                digest: {
+                  logs: [
+                    {
+                      PreRuntime: [
+                        BABE
+                        0x03010000006101a71000000000224fef8d77124c64452eaeaf497843ce8e4089205697f1e32a29cbd2d487d865f7b3eb0ed73d2e68e4417fa8dd06cdb1648ae5dd10d8426d896a47a32136c8060fd5729a3fdf8aed91b0ebb5a246dfadc289ad961024809dad958aed11e44f09
+                      ]
+                    }
+                    {
+                      Consensus: [
+                        BEEF
+                        0x03668d0244dd3babf756bfd116fc5b617e5ffbdfbeb7f2bf0f47c0dce6e3b58f83
+                      ]
+                    }
+                    {
+                      Seal: [
+                        BABE
+                        0x4c83bb83333cc6680c8811fe83ca2dd3bca8f678915d94f8c697c8e9efa0f9526487aa27bdc9bb12878483772fd32b128f794e0cde0eec87b32ae94943a23f84
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+          method: enter
+          section: paraInherent
+        }
+      }
+    ]
+  }
+  justifications: null
+}

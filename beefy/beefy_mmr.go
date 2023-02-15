@@ -154,13 +154,6 @@ func VerifyMMRProof(sc types.SignedCommitment, mmrSize uint64, leafIndex uint64,
 			}
 			log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
 
-			//TODO: encoded again for testing
-			mmrLeafBytes, err := codec.Encode(encodedMMRLeaf)
-			if err != nil {
-				return false, err
-			}
-			log.Printf("mmrLeafBytes: %#x", mmrLeafBytes)
-
 			// we treat this leaf as the latest leaf in the mmr
 			// mmrSize := mmr.LeafIndexToMMRSize(leafIndex)
 			// log.Printf("mmrSize:%d\n ", mmrSize)
@@ -186,26 +179,6 @@ func VerifyMMRProof(sc types.SignedCommitment, mmrSize uint64, leafIndex uint64,
 			log.Printf("cal mmr root:%#x\n ", calMMRRoot)
 			log.Printf("payload.Data:%#x\n ", payload.Data)
 			ret := reflect.DeepEqual(calMMRRoot, payload.Data)
-			log.Printf("reflect.DeepEqual result :%#v", ret)
-
-			//TODO: test for mmrLeafBytes leaf
-			mmrLeaves2 := []merkletypes.Leaf{
-				{
-					Hash:  crypto.Keccak256(mmrLeafBytes),
-					Index: leafIndex,
-				},
-			}
-			mmrProof2 := mmr.NewProof(mmrSize, mmrLeafProof, mmrLeaves2, hasher.Keccak256Hasher{})
-			// if !mmrProof2.Verify(payload.Data) {
-			// 	return false, err
-			// }
-			calMMRRoot2, err := mmrProof2.CalculateRoot()
-			if err != nil {
-				return false, err
-			}
-			log.Printf("cal mmr root2:%#x\n ", calMMRRoot2)
-			log.Printf("payload.Data:%#x\n ", payload.Data)
-			ret = reflect.DeepEqual(calMMRRoot2, payload.Data)
 			log.Printf("reflect.DeepEqual result :%#v", ret)
 
 			break

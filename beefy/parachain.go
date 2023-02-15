@@ -114,7 +114,7 @@ func QueryParaChainStorage(conn *gsrpc.SubstrateAPI, targetParaID uint32, fromHa
 func BuildRelayerHeaderMap(conn *gsrpc.SubstrateAPI, blockHash types.Hash, changeSet []types.StorageChangeSet) (map[uint32]map[uint32][]byte, []uint64, error) {
 
 	var relayerHeaderMap = make(map[uint32]map[uint32][]byte)
-	// request for batch mmr proof of those leaves
+	// all the leaf index for relay chain header
 	var relayChainHeaderIdxes []uint64
 
 	paraIds, err := GetParaChainIDs(conn, blockHash)
@@ -148,7 +148,7 @@ func BuildRelayerHeaderMap(conn *gsrpc.SubstrateAPI, blockHash types.Hash, chang
 
 		// relayerHeaderIndex := uint64(GetLeafIndexForBlockNumber(BEEFY_ACTIVATION_BLOCK, uint32(relayChainHeader.Number)))
 		relayerHeaderIndex := uint64(relayChainHeader.Number)
-		log.Printf("relayChainHeader.Number: %d relayerHeaderIndex: %d", relayChainHeader.Number, relayerHeaderIndex)
+		log.Printf("relayChainHeader.Number: %d relayerLeafIndex: %d", relayChainHeader.Number, relayerHeaderIndex)
 		relayChainHeaderIdxes = append(relayChainHeaderIdxes, relayerHeaderIndex)
 	}
 	return relayerHeaderMap, relayChainHeaderIdxes, nil
@@ -193,7 +193,7 @@ func BuildTargetParaHeaderProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash, 
 		relayerLeafWithIdx := LeafWithIndex{Leaf: mmrBatchProof.Leaves[i], Index: uint64(mmrBatchProof.Proof.LeafIndex[i])}
 		log.Printf("idxedLeaf: %+v", relayerLeafWithIdx)
 		var leafBlockNumber = GetBlockNumberForLeaf(BEEFY_ACTIVATION_BLOCK, uint32(relayerLeafWithIdx.Index))
-		// var leafBlockNumber = uint32(idxedLeaf.Index)
+		// var leafBlockNumber = uint32(relayerLeafWithIdx.Index)
 		log.Printf("leaf index: %d leafBlockNumber: %d", relayerLeafWithIdx.Index, leafBlockNumber)
 		paraHeaderMap := relayerHeaderMap[leafBlockNumber]
 		log.Printf("relayer header number : %d  paraHeaderMap: %+v", leafBlockNumber, paraHeaderMap)
@@ -278,7 +278,8 @@ type BeefyMmrLeaf struct {
 	ParachainHeads SizedByte32 `protobuf:"bytes,5,opt,name=parachain_heads,json=parachainHeads,proto3,customtype=SizedByte32" json:"parachain_heads,omitempty"`
 }
 
-func BuildMMRProofFromParaHeaders(paraHeaderWithProofs []ParaHeaderWithProof, mmrSize uint64, mmrProofs [][]byte) (*mmr.Proof, error) {
+func BuildMMRProofFromParaHeaders(paraHeaderWithProofs []ParaHeaderWithProof, mmrSize uint64, mmrBatchProof GenerateMmrBatchProofResponse) (*mmr.Proof, error) {
+
 	paraHeadProofsLen := len(paraHeaderWithProofs)
 	log.Printf("proofsLen: %d", paraHeadProofsLen)
 	mmrLeaves := make([]merkletypes.Leaf, paraHeadProofsLen)
@@ -301,7 +302,7 @@ func BuildMMRProofFromParaHeaders(paraHeaderWithProofs []ParaHeaderWithProof, mm
 		log.Printf("paraHeaderProof.HeadsTotalCount: %d", paraHeaderWithProof.HeadsTotalCount)
 		//build merkle proof from para chain header proof
 		paraHeadMerkleProof := merkle.NewProof(headLeaf, paraHeaderWithProof.ParachainHeadsProof, uint64(paraHeaderWithProof.HeadsTotalCount), hasher.Keccak256Hasher{})
-		// todo: merkle.Proof.Root() should return fixed bytes
+		// TODO: merkle.Proof.Root() should return fixed bytes
 		paraHeadersMerkleRoot, err := paraHeadMerkleProof.Root()
 		log.Printf("parachainHeadsRoot: %#x", paraHeadersMerkleRoot)
 
@@ -334,13 +335,23 @@ func BuildMMRProofFromParaHeaders(paraHeaderWithProofs []ParaHeaderWithProof, mm
 			// based on our knowledge of the beefy protocol, and the structure of MMRs
 			// we are be able to reconstruct the leaf index of this mmr leaf
 			// given the parent_number of this leaf, the beefy activation block
-			Index: uint64(GetLeafIndexForBlockNumber(BEEFY_ACTIVATION_BLOCK, paraHeaderWithProof.MmrLeafPartial.ParentNumber+1)),
+			// Index: uint64(GetLeafIndexForBlockNumber(BEEFY_ACTIVATION_BLOCK, paraHeaderWithProof.MmrLeafPartial.ParentNumber+1)),
+			Index: uint64(mmrBatchProof.Proof.LeafIndex[i]),
 			Hash:  crypto.Keccak256(encodedMMRLeaf),
 		}
 	}
 
+	// convert proof items
+	var mmrBatchProofItems = make([][]byte, len(mmrBatchProof.Proof.Items))
+	for i := 0; i < len(mmrBatchProof.Proof.Items); i++ {
+		mmrBatchProofItems[i] = mmrBatchProof.Proof.Items[i][:]
+	}
+	// log.Printf("mmrBatchProof Proof Items count: %d", len(mmrBatchProofItems))
+	// for _, item := range mmrBatchProofItems {
+	// 	log.Printf("mmrBatchProof Proof Item: %#x", item)
+	// }
 	// build mmr proof from mmr leaves
-	mmrProof := mmr.NewProof(mmrSize, mmrProofs, mmrLeaves, hasher.Keccak256Hasher{})
+	mmrProof := mmr.NewProof(mmrSize, mmrBatchProofItems, mmrLeaves, hasher.Keccak256Hasher{})
 
 	return mmrProof, nil
 }
