@@ -3,40 +3,29 @@ package beefy
 import (
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/client"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/xxhash"
+	trie_proof "github.com/octopus-network/trie-go/trie/proof"
 )
 
-func GetParaChainTimestamp(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (types.U64, error) {
-	// Fetch metadata
-	meta, err := conn.RPC.State.GetMetadataLatest()
-	if err != nil {
-		return 0, err
-	}
+// CreateStorageKeyPrefix creates a key prefix for keys of a map.
+// Can be used as an input to the state.GetKeys() RPC, in order to list the keys of map.
+func CreateStorageKeyPrefix(prefix, method string) []byte {
+	return append(xxhash.New128([]byte(prefix)).Sum(nil), xxhash.New128([]byte(method)).Sum(nil)...)
+}
 
-	storageKey, err := types.CreateStorageKey(meta, "Timestamp", "Now")
-	if err != nil {
-		return 0, err
-	}
-	log.Printf("storageKey: %#x", storageKey)
-
-	var timestamp types.U64
-
-	ok, err := conn.RPC.State.GetStorage(storageKey, &timestamp, blockHash)
-	if err != nil {
-		return 0, err
-	}
-
-	if !ok {
-		return 0, fmt.Errorf("parachain header not found")
-	}
-
-	return timestamp, nil
+type StateProof struct {
+	// storage key
+	Key []byte `json:"key,omitempty"`
+	// the scale encode value
+	Value []byte ` json:"timestamp,omitempty"`
+	// these proof gets from parachain by rpc methord:state_getReadProof
+	Proofs [][]byte `json:"proofs,omitempty"`
 }
 
 type ReadProofResponse struct {
@@ -91,7 +80,7 @@ func GetStateProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash, storageKeys [
 	return rp, nil
 }
 
-func GetParaHeaderProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash, paraId uint32) (ReadProofResponse, error) {
+func GetParachainHeaderProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash, paraId uint32) (ReadProofResponse, error) {
 
 	var rp ReadProofResponse
 	// Fetch metadata
@@ -160,7 +149,14 @@ func GetTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (ReadProo
 
 }
 
-//TODO: verifyTimestamp Proof
-func VerifyTimestampProof() {
+// verify state proof
+func VerifyStateProof(stateProof [][]byte, stateRoot []byte, key []byte, value []byte) (bool, error) {
+	//
+	err := trie_proof.Verify(stateProof, stateRoot, key, value)
+
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 
 }

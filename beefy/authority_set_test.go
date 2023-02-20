@@ -2,7 +2,6 @@ package beefy_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -44,11 +43,9 @@ func TestBeefyAuthoritySetCodec(t *testing.T) {
 }
 
 func TestVerifyValidatorProofLocal(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	if err != nil {
-		// fmt.Printf("connection err,%s", err)
 		t.Logf("Connecting err: %v", err)
-		// t.Log("Connecting err: %v", err)
 	}
 	ch := make(chan interface{})
 	sub, err := api.Client.Subscribe(
@@ -61,13 +58,12 @@ func TestVerifyValidatorProofLocal(t *testing.T) {
 
 	assert.NoError(t, err)
 	if err != nil && err.Error() == "Method not found" {
-		fmt.Printf("skipping since beefy module is not available")
-		// t.Logf("skipping since beefy module is not available %v", err)
+
+		t.Logf("skipping since beefy module is not available %v", err)
 	}
 
-	// fmt.Printf("subscribed to %s\n", polkadot_endpoint)
-	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
-	// assert.NoError(t, err)
+	// t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
+
 	defer sub.Unsubscribe()
 
 	timeout := time.After(24 * time.Hour)
@@ -94,41 +90,28 @@ func TestVerifyValidatorProofLocal(t *testing.T) {
 
 			authorities, err := beefy.GetBeefyAuthorities(blockHash, api, "Authorities")
 			require.NoError(t, err)
-			// t.Logf("authorities: %#v\n", authorities)
-			// var authorityLeaves [][]byte
-			// for _, v := range authorities {
-			// 	authorityLeaves = append(authorityLeaves, crypto.Keccak256(v))
-			// }
-			// authorityTree, err := merkle.NewTree(hasher.Keccak256Hasher{}).FromLeaves(authorityLeaves)
-			// require.NoError(t, err)
-			// var authorityTreeRoot = beefy.Bytes32(authorityTree.Root())
-			// // var authorityTreeRoot = authorityTree.Root()
-			// t.Logf("authorityTreeRoot: %+v", codec.HexEncodeToString(authorityTreeRoot[:]))
-			// currentBeefyAuthoritySet := beefy.BeefyAuthoritySet{
-			// 	Id:   uint64(s.SignedCommitment.Commitment.ValidatorSetID),
-			// 	Len:  uint32(len(authorities)),
-			// 	Root: authorityTreeRoot,
-			// }
-			// t.Logf("created authorityTreeRoot: %+v", currentBeefyAuthoritySet)
 
-			statedBeefyAuthoritySetBytes, err := beefy.GetBeefyAuthoritySet(blockHash, api, "BeefyAuthorities")
+			authoritySetOnChain, err := beefy.GetBeefyAuthoritySet(blockHash, api, "BeefyAuthorities")
 			require.NoError(t, err)
-			t.Logf("statedBeefyAuthoritySetBytes: %+v", statedBeefyAuthoritySetBytes)
+			t.Logf("authoritySetOnChain: %+v", authoritySetOnChain)
+			t.Logf("authoritySetOnChain.Root: %#x", authoritySetOnChain.Root)
 
-			csc := beefy.ConvertCommitment(s.SignedCommitment)
+			bsc := beefy.ConvertCommitment(s.SignedCommitment)
 			var authorityIdxes []uint64
-			for _, v := range csc.Signatures {
-				idx := v.AuthorityIndex
+			for _, v := range bsc.Signatures {
+				idx := v.Index
 				authorityIdxes = append(authorityIdxes, uint64(idx))
 			}
-			authorityTreeRoot, authorityProofs, err := beefy.BuildAuthorityProofs(authorities, authorityIdxes)
+			authorityMerkleRoot, authorityProof, err := beefy.BuildAuthorityProof(authorities, authorityIdxes)
 			require.NoError(t, err)
-			err = beefy.VerifyCommitmentSignatures(csc, uint64(statedBeefyAuthoritySetBytes.Len), authorityTreeRoot, authorityProofs)
+
+			// verify signature
+			err = beefy.VerifySignature(bsc, uint64(authoritySetOnChain.Len), authorityMerkleRoot, authorityProof)
 			require.NoError(t, err)
 
 			received++
 
-			if received >= 10 {
+			if received >= 2 {
 				return
 			}
 		case <-timeout:

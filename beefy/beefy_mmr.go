@@ -17,15 +17,20 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
-const BEEFY_ACTIVATION_BLOCK uint32 = 0
-
-type LeafWithIndex struct {
-	Leaf  types.MMRLeaf
+type MMRLeafWithIndex struct {
 	Index uint64
+	Leaf  types.MMRLeaf
+}
+
+type MMRLeavesAndBatchProof struct {
+	// mmr leaves
+	Leaves []types.MMRLeaf `json:"leaves"`
+	// mmr batch proof
+	MmrBatchProof MMRBatchProof `protobuf:"bytes,2,opt,name=mmr_batch_proof,json=mmrBatchProof,proto3" json:"mmr_batch_proof"`
 }
 
 // MmrProof is a MMR proof
-type MmrBatchProof struct {
+type MMRBatchProof struct {
 	// The index of the leaf the proof is for.
 	LeafIndex []types.U64
 	// Number of leaves in MMR, when the proof was generated.
@@ -34,23 +39,11 @@ type MmrBatchProof struct {
 	Items []types.H256
 }
 
-// GenerateProof retrieves a MMR proof and leaf for the specified leave index, at the given blockHash (useful to query a
-// proof at an earlier block, likely with another MMR root)
-func BuildMMRBatchProof(conn *gsrpc.SubstrateAPI, blockHash *types.Hash, idxes []uint64) (GenerateMmrBatchProofResponse, error) {
-	var batchProofResp GenerateMmrBatchProofResponse
-	err := client.CallWithBlockHash(conn.Client, &batchProofResp, "mmr_generateBatchProof", blockHash, idxes)
-	if err != nil {
-		return GenerateMmrBatchProofResponse{}, err
-	}
-
-	return batchProofResp, nil
-}
-
 // GenerateMmrBatchProofResponse contains the generate batch proof rpc response
 type GenerateMmrBatchProofResponse struct {
 	BlockHash types.H256
 	Leaves    []types.MMRLeaf
-	Proof     MmrBatchProof
+	Proof     MMRBatchProof
 }
 
 // UnmarshalJSON fills u with the JSON encoded byte array given by b
@@ -88,59 +81,89 @@ func (d *GenerateMmrBatchProofResponse) UnmarshalJSON(bz []byte) error {
 	}
 	return nil
 }
-func GetBlockNumberForLeaf(beefyActivationBlock uint32, leafIndex uint32) uint32 {
-	var blockNumber uint32
 
-	// calculate the leafIndex for this leaf.
-	if beefyActivationBlock == 0 {
-		// in this case the leaf index is the same as the block number - 1 (leaf index starts at 0)
-		blockNumber = leafIndex + 1
-	} else {
-		// in this case the leaf index is activation block - current block number.
-		blockNumber = beefyActivationBlock + leafIndex
+// GenerateProof retrieves a MMR proof and leaf for the specified leave index, at the given blockHash (useful to query a
+// proof at an earlier block, likely with another MMR root)
+func BuildMMRBatchProof(conn *gsrpc.SubstrateAPI, blockHash *types.Hash, idxes []uint64) (GenerateMmrBatchProofResponse, error) {
+	var batchProofResp GenerateMmrBatchProofResponse
+	err := client.CallWithBlockHash(conn.Client, &batchProofResp, "mmr_generateBatchProof", blockHash, idxes)
+	if err != nil {
+		return GenerateMmrBatchProofResponse{}, err
 	}
 
-	return blockNumber
+	return batchProofResp, nil
 }
 
-// GetLeafIndexForBlockNumber given the MmrLeafPartial.ParentNumber & BeefyActivationBlock,
-func GetLeafIndexForBlockNumber(beefyActivationBlock uint32, blockNumber uint32) uint64 {
-	var leafIndex uint32
+// verify batch mmr proof
+func VerifyMMRBatchProof(payload types.PayloadItem, mmrSize uint64, mmrLeaves []types.MMRLeaf, mmrbatchProof MMRBatchProof) (bool, error) {
+	// TODO: check the parameters
 
-	// calculate the leafIndex for this leaf.
-	if beefyActivationBlock == 0 {
-		// in this case the leaf index is the same as the block number - 1 (leaf index starts at 0)
-		leafIndex = blockNumber - 1
-	} else {
-		// in this case the leaf index is activation block - current block number.
-		// leafIndex = beefyActivationBlock - (blockNumber + 1)
-		leafIndex = (blockNumber + 1) - beefyActivationBlock
+	mmrRootID := []byte("mh")
+	log.Printf("\nmmrRootID: %s\npayload.ID: %s", mmrRootID, payload.ID)
+	// checks for the right payloadId
+	if bytes.Equal(payload.ID[:], mmrRootID) {
+		leafNum := len(mmrLeaves)
+		var leaves = make([]merkletypes.Leaf, leafNum)
+		for i := 0; i < leafNum; i++ {
+			// scale encode the mmr leaf
+			encodedMMRLeaf, err := codec.Encode(mmrLeaves[i])
+			if err != nil {
+				return false, err
+			}
+			log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
+			leaf := merkletypes.Leaf{
+				Hash:  crypto.Keccak256(encodedMMRLeaf),
+				Index: uint64(mmrbatchProof.LeafIndex[i]),
+			}
+			leaves[i] = leaf
+		}
+
+		var proofItmes = make([][]byte, len(mmrbatchProof.Items))
+		for i := 0; i < len(mmrbatchProof.Items); i++ {
+			proofItmes[i] = mmrbatchProof.Items[i][:]
+		}
+
+		mmrProof := mmr.NewProof(mmrSize, proofItmes, leaves, hasher.Keccak256Hasher{})
+		calMMRRoot, err := mmrProof.CalculateRoot()
+
+		if err != nil {
+			return false, err
+		}
+		log.Printf("cal mmr root:%#x", calMMRRoot)
+		log.Printf("payload.Data:%#x", payload.Data)
+		ret := reflect.DeepEqual(calMMRRoot, payload.Data)
+		log.Printf("reflect.DeepEqual result :%#v", ret)
+
+		return ret, nil
 	}
 
-	return uint64(leafIndex)
+	return false, nil
+
 }
 
+// build single mmr proof
 func BuildMMRProof(conn *gsrpc.SubstrateAPI, leafIndex uint64, blockHash types.Hash) (types.H256, types.MMRLeaf, types.MMRProof, error) {
 	resp, err := conn.RPC.MMR.GenerateProof(leafIndex, blockHash)
 	if err != nil {
 		return types.H256{}, types.MMRLeaf{}, types.MMRProof{}, err
 	}
 
-	log.Printf("\nLeafIndex:%d\nGenerated MMR Proof: %+v", leafIndex, resp)
-	retBlockHash, mmrLeaf, proof := resp.BlockHash, resp.Leaf, resp.Proof
-	var mmrLeafProof = make([][]byte, len(proof.Items))
-	for i := 0; i < len(proof.Items); i++ {
-		mmrLeafProof[i] = proof.Items[i][:]
-	}
+	retBlockHash, mmrLeaf, mmrProof := resp.BlockHash, resp.Leaf, resp.Proof
+	log.Printf("\nretBlockHash: %#x \nLeafIndex: %d \nmmrLeaf: %+v \nmrProof: %+v", retBlockHash, leafIndex, mmrLeaf, mmrProof)
+	// var mmrLeafProof = make([][]byte, len(mmrProof.Items))
+	// for i := 0; i < len(mmrProof.Items); i++ {
+	// 	mmrLeafProof[i] = mmrProof.Items[i][:]
+	// }
 
-	return retBlockHash, mmrLeaf, proof, nil
+	return retBlockHash, mmrLeaf, mmrProof, nil
 
 }
 
-func VerifyMMRProof(sc types.SignedCommitment, mmrSize uint64, leafIndex uint64, mmrLeaf types.MMRLeaf, mmrLeafProof [][]byte) (bool, error) {
+// verify single mmr proof
+func VerifyMMRProof(commitment types.Commitment, mmrSize uint64, leafIndex uint64, mmrLeaf types.MMRLeaf, mmrLeafProof [][]byte) (bool, error) {
 	// TODO: check the parameters
 
-	for _, payload := range sc.Commitment.Payload {
+	for _, payload := range commitment.Payload {
 		mmrRootID := []byte("mh")
 		log.Printf("\nmmrRootID: %s\npayload.ID: %s", mmrRootID, payload.ID)
 		// checks for the right payloadId

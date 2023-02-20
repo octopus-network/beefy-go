@@ -73,56 +73,36 @@ func TestDecodeExtrinsicTimestamp(t *testing.T) {
 	require.Equal(t, timeUnix, unixTimeFromExtrinsic.Uint64(), "failed to decode unix timestamp")
 
 }
-func TestGetParaChainInfoLocal(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+func TestGetParachainInfoLive(t *testing.T) {
+
+	//local testnet
+	local, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)
-	blockHash, err := api.RPC.Chain.GetFinalizedHead()
+	blockHash, err := local.RPC.Chain.GetFinalizedHead()
 	require.NoError(t, err)
 	t.Logf("blockHash: %#x", blockHash)
-	paraChainIds, err := beefy.GetParaChainIDs(api, blockHash)
+	paraChainIds, err := beefy.GetParachainIds(local, blockHash)
 	require.NoError(t, err)
 	t.Logf("paraChainIds: %+v", paraChainIds)
 	for _, paraChainId := range paraChainIds {
 		t.Logf("paraChainId: %d", paraChainId)
-		paraChainHeader, err := beefy.GetParaChainHeader(api, uint32(paraChainId), blockHash)
+		paraChainHeader, err := beefy.GetParachainHeader(local, uint32(paraChainId), blockHash)
 		require.NoError(t, err)
 		t.Logf("paraChainHeader: %#x", paraChainHeader)
 	}
-}
 
-func TestGetParaChainInfoRococo(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(ROCOCO_ENDPOIN)
+	// rococo  testnet
+	rococo, err := gsrpc.NewSubstrateAPI(beefy.ROCOCO_ENDPOIN)
 	require.NoError(t, err)
-	blockHash, err := api.RPC.Chain.GetFinalizedHead()
+	blockHash, err = rococo.RPC.Chain.GetFinalizedHead()
 	require.NoError(t, err)
 	t.Logf("blockHash: %#x", blockHash)
-	paraChainIds, err := beefy.GetParaChainIDs(api, blockHash)
+	paraChainIds, err = beefy.GetParachainIds(rococo, blockHash)
 	require.NoError(t, err)
 	t.Logf("paraChainIds: %+v", paraChainIds)
 	for _, paraChainId := range paraChainIds {
 		t.Logf("paraChainId: %d", paraChainId)
-		paraChainHeader, err := beefy.GetParaChainHeader(api, uint32(paraChainId), blockHash)
-		require.NoError(t, err)
-		t.Logf("paraChainHeader: %#x", paraChainHeader)
-		var decodeParachainHeader types.Header
-		err = codec.Decode(paraChainHeader, &decodeParachainHeader)
-		require.NoError(t, err)
-		t.Logf("decodeParachainHeader: %+v", decodeParachainHeader)
-	}
-}
-
-func TestGetParaChainInfoPolkadot(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(POLKADOT_ENDPOINT)
-	require.NoError(t, err)
-	blockHash, err := api.RPC.Chain.GetFinalizedHead()
-	require.NoError(t, err)
-	t.Logf("blockHash: %#x", blockHash)
-	paraChainIds, err := beefy.GetParaChainIDs(api, blockHash)
-	require.NoError(t, err)
-	t.Logf("paraChainIds: %+v", paraChainIds)
-	for _, paraChainId := range paraChainIds {
-		t.Logf("paraChainId: %d", paraChainId)
-		paraChainHeader, err := beefy.GetParaChainHeader(api, uint32(paraChainId), blockHash)
+		paraChainHeader, err := beefy.GetParachainHeader(rococo, uint32(paraChainId), blockHash)
 		require.NoError(t, err)
 		t.Logf("paraChainHeader: %#x", paraChainHeader)
 		var decodeParachainHeader types.Header
@@ -131,10 +111,29 @@ func TestGetParaChainInfoPolkadot(t *testing.T) {
 		t.Logf("decodeParachainHeader: %+v", decodeParachainHeader)
 	}
 
+	// polkadot mainnet
+	polkadot, err := gsrpc.NewSubstrateAPI(beefy.ROCOCO_ENDPOIN)
+	require.NoError(t, err)
+	blockHash, err = polkadot.RPC.Chain.GetFinalizedHead()
+	require.NoError(t, err)
+	t.Logf("blockHash: %#x", blockHash)
+	paraChainIds, err = beefy.GetParachainIds(polkadot, blockHash)
+	require.NoError(t, err)
+	t.Logf("paraChainIds: %+v", paraChainIds)
+	for _, paraChainId := range paraChainIds {
+		t.Logf("paraChainId: %d", paraChainId)
+		paraChainHeader, err := beefy.GetParachainHeader(polkadot, uint32(paraChainId), blockHash)
+		require.NoError(t, err)
+		t.Logf("paraChainHeader: %#x", paraChainHeader)
+		var decodeParachainHeader types.Header
+		err = codec.Decode(paraChainHeader, &decodeParachainHeader)
+		require.NoError(t, err)
+		t.Logf("decodeParachainHeader: %+v", decodeParachainHeader)
+	}
 }
 
 func TestQueryParaChainStorageLocal(t *testing.T) {
-	relayApi, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	relayApi, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)
 
 	latestFinalizedHash, err := relayApi.RPC.Chain.GetFinalizedHead()
@@ -156,7 +155,7 @@ func TestQueryParaChainStorageLocal(t *testing.T) {
 	// t.Logf("toBlockNumber: %d", toBlockNumber)
 	t.Logf("toBlockHash: %#x", latestFinalizedHash)
 
-	changeSets, err := beefy.QueryParaChainStorage(relayApi, LOCAL_PARACHAIN_ID, fromFinalizedHash, latestFinalizedHash)
+	changeSets, err := beefy.QueryParachainStorage(relayApi, beefy.LOCAL_PARACHAIN_ID, fromFinalizedHash, latestFinalizedHash)
 	require.NoError(t, err)
 	t.Logf("changeSet len: %d", len(changeSets))
 	for _, changeSet := range changeSets {
@@ -178,8 +177,60 @@ func TestQueryParaChainStorageLocal(t *testing.T) {
 
 }
 
+func TestQueryStorageRococo(t *testing.T) {
+	relayApi, err := gsrpc.NewSubstrateAPI(beefy.ROCOCO_ENDPOIN)
+	require.NoError(t, err)
+
+	var startBlockNumber = 3707562
+	t.Logf("startBlockNumber: %d", startBlockNumber)
+	t.Logf("startBlockNumber+1: %d", startBlockNumber+1)
+	startFinalizedHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(startBlockNumber + 1))
+	require.NoError(t, err)
+	t.Logf("startFinalizedHash: %#x", startFinalizedHash)
+
+	var endBlockNumber = 3707570
+	t.Logf("endBlockNumber: %d", endBlockNumber)
+	endFinalizedHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(endBlockNumber))
+	require.NoError(t, err)
+	t.Logf("endBlockNumber: %#x", endFinalizedHash)
+
+	var paraHeaderKeys []types.StorageKey
+
+	// create full storage key for our own paraId
+	keyPrefix := beefy.CreateStorageKeyPrefix("Paras", "Heads")
+	t.Logf("keyPrefix: %s", codec.HexEncodeToString(keyPrefix[:]))
+	// so we can query all blocks from lastfinalized to latestBeefyHeight
+	t.Logf("ROCOCO_PARACHAIN_ID: %d", beefy.ROCOCO_ROCKMIN_ID)
+	encodedParaID, err := codec.Encode(beefy.ROCOCO_ROCKMIN_ID)
+	t.Logf("encodedParaID: %#x", encodedParaID)
+	require.NoError(t, err)
+
+	twoXHash := xxhash.New64(encodedParaID).Sum(nil)
+	t.Logf("encodedParaID twoXHash: %#x", twoXHash)
+	// full key path in the storage source: https://www.shawntabrizi.com/assets/presentations/substrate-storage-deep-dive.pdf
+	// xx128("Paras") + xx128("Heads") + xx64(Encode(paraId)) + Encode(paraId)
+	fullKey := append(append(keyPrefix, twoXHash[:]...), encodedParaID...)
+	t.Logf("fullKey: %#x", fullKey)
+	paraHeaderKeys = append(paraHeaderKeys, fullKey)
+
+	var changSet []types.StorageChangeSet
+
+	for i := startBlockNumber + 1; i <= endBlockNumber; i++ {
+		blockHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(i))
+		t.Logf("blockHash: %#x", blockHash)
+		require.NoError(t, err)
+		cs, err := relayApi.RPC.State.QueryStorageAt(paraHeaderKeys, blockHash)
+		require.NoError(t, err)
+		t.Logf("cs: %+v", cs)
+		changSet = append(changSet, cs...)
+		// t.Logf("changeSet: %#v", changeSet)
+
+	}
+	t.Logf("changeSet: %+v", changSet)
+}
+
 func TestBuildRelayerHeaderMapLocal(t *testing.T) {
-	relayApi, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	relayApi, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)
 
 	latestFinalizedHash, err := relayApi.RPC.Chain.GetFinalizedHead()
@@ -201,7 +252,7 @@ func TestBuildRelayerHeaderMapLocal(t *testing.T) {
 	// t.Logf("toBlockNumber: %d", toBlockNumber)
 	t.Logf("toBlockHash: %#x", latestFinalizedHash)
 
-	changeSets, err := beefy.QueryParaChainStorage(relayApi, LOCAL_PARACHAIN_ID, fromFinalizedHash, latestFinalizedHash)
+	changeSets, err := beefy.QueryParachainStorage(relayApi, beefy.LOCAL_PARACHAIN_ID, fromFinalizedHash, latestFinalizedHash)
 	require.NoError(t, err)
 	t.Logf("changeSet len: %d", len(changeSets))
 	for _, changeSet := range changeSets {
@@ -221,7 +272,7 @@ func TestBuildRelayerHeaderMapLocal(t *testing.T) {
 
 	}
 
-	relayerHeaderMap, relayChainHeaderIdxes, err := beefy.BuildRelayerHeaderMap(relayApi, latestFinalizedHash, changeSets)
+	relayerHeaderMap, relayChainHeaderIdxes, err := beefy.BuildRelaychainHeaderMap(relayApi, latestFinalizedHash, changeSets)
 	require.NoError(t, err)
 	t.Logf("relayerHeaderMap len: %d", len(relayerHeaderMap))
 	t.Logf("relayChainHeaderIdxes: %+v", relayChainHeaderIdxes)
@@ -236,9 +287,10 @@ func TestBuildRelayerHeaderMapLocal(t *testing.T) {
 	}
 }
 
-func TestBuildAndVerifyParaHeaderProofLocal(t *testing.T) {
+//TODO: fix build mmr proof from header
+func TestBuildAndVerifyParaHeaderProofLocal1(t *testing.T) {
 
-	relayApi, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	relayApi, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)
 
 	latestFinalizedHash, err := relayApi.RPC.Chain.GetFinalizedHead()
@@ -260,7 +312,7 @@ func TestBuildAndVerifyParaHeaderProofLocal(t *testing.T) {
 	// t.Logf("toBlockNumber: %d", toBlockNumber)
 	t.Logf("toBlockHash: %#x", latestFinalizedHash)
 
-	changeSets, err := beefy.QueryParaChainStorage(relayApi, LOCAL_PARACHAIN_ID, fromFinalizedHash, latestFinalizedHash)
+	changeSets, err := beefy.QueryParachainStorage(relayApi, beefy.LOCAL_PARACHAIN_ID, fromFinalizedHash, latestFinalizedHash)
 	require.NoError(t, err)
 	t.Logf("changeSet len: %d", len(changeSets))
 	for _, changeSet := range changeSets {
@@ -280,7 +332,7 @@ func TestBuildAndVerifyParaHeaderProofLocal(t *testing.T) {
 	}
 
 	// find all the relay chain header that includes target parachain header
-	relayerHeaderMap, relayChainHeaderIdxes, err := beefy.BuildRelayerHeaderMap(relayApi, latestFinalizedHash, changeSets)
+	relayerHeaderMap, relayChainHeaderIdxes, err := beefy.BuildRelaychainHeaderMap(relayApi, latestFinalizedHash, changeSets)
 	require.NoError(t, err)
 	t.Logf("relayerHeaderMap len: %d", len(relayerHeaderMap))
 	t.Logf("relayChainHeaderIdxes: %+v", relayChainHeaderIdxes)
@@ -317,12 +369,13 @@ func TestBuildAndVerifyParaHeaderProofLocal(t *testing.T) {
 	// }
 
 	// build para chain head proof
-	targetParaHeaderWithProofs, err := beefy.BuildTargetParaHeaderProof(relayApi, latestFinalizedHash, mmrBatchProof, relayerHeaderMap, LOCAL_PARACHAIN_ID)
+	targetParaHeaderWithProofs, err := beefy.BuildParachainHeaderProof(relayApi, latestFinalizedHash, mmrBatchProof,
+		relayerHeaderMap, beefy.LOCAL_PARACHAIN_ID)
 	require.NoError(t, err)
 	t.Logf("targetParaHeaderWithProofs: %+v", targetParaHeaderWithProofs)
 
 	// // build mmr proof from para headers proof
-	leafIndex := beefy.GetLeafIndexForBlockNumber(beefy.BEEFY_ACTIVATION_BLOCK, uint32(toBlockNumber))
+	leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(beefy.BEEFY_ACTIVATION_BLOCK, uint32(toBlockNumber))
 	// t.Logf("leafIndex: %d", leafIndex)
 	mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
 	// mmrSize := mmr.LeafIndexToMMRSize(uint64(mmrBatchProof.Proof.LeafCount))
@@ -336,8 +389,9 @@ func TestBuildAndVerifyParaHeaderProofLocal(t *testing.T) {
 	// beefy.VerifyParaChainHeaderProofs()
 }
 
+//TODO: fix build mmr proof from header
 func TestBuildAndVerifyParaHeaderProofLocal2(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	if err != nil {
 		t.Logf("Connecting err: %v", err)
 	}
@@ -352,7 +406,7 @@ func TestBuildAndVerifyParaHeaderProofLocal2(t *testing.T) {
 
 	require.NoError(t, err)
 
-	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
+	t.Logf("subscribed to %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
 
 	defer sub.Unsubscribe()
 
@@ -396,7 +450,7 @@ func TestBuildAndVerifyParaHeaderProofLocal2(t *testing.T) {
 			// t.Logf("toBlockNumber: %d", toBlockNumber)
 			t.Logf("toBlockHash: %#x", latestSignedCommitmentBlockHash)
 
-			changeSets, err := beefy.QueryParaChainStorage(api, LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
+			changeSets, err := beefy.QueryParachainStorage(api, beefy.LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
 			require.NoError(t, err)
 			t.Logf("changeSet len: %d", len(changeSets))
 			for _, changeSet := range changeSets {
@@ -416,7 +470,7 @@ func TestBuildAndVerifyParaHeaderProofLocal2(t *testing.T) {
 
 			}
 
-			relayerHeaderMap, relayChainHeaderIdxes, err := beefy.BuildRelayerHeaderMap(api, latestSignedCommitmentBlockHash, changeSets)
+			relayerHeaderMap, relayChainHeaderIdxes, err := beefy.BuildRelaychainHeaderMap(api, latestSignedCommitmentBlockHash, changeSets)
 			require.NoError(t, err)
 			t.Logf("relayerHeaderMap len: %d", len(relayerHeaderMap))
 			t.Logf("relayChainHeaderIdxes: %+v", relayChainHeaderIdxes)
@@ -454,7 +508,8 @@ func TestBuildAndVerifyParaHeaderProofLocal2(t *testing.T) {
 
 			//----------------
 			// build para chain head proof
-			targetParaHeaderWithProofs, err := beefy.BuildTargetParaHeaderProof(api, latestSignedCommitmentBlockHash, mmrBatchProof, relayerHeaderMap, LOCAL_PARACHAIN_ID)
+			targetParaHeaderWithProofs, err := beefy.BuildParachainHeaderProof(api, latestSignedCommitmentBlockHash,
+				mmrBatchProof, relayerHeaderMap, beefy.LOCAL_PARACHAIN_ID)
 			require.NoError(t, err)
 			t.Logf("targetParaHeaderWithProofs: %+v", targetParaHeaderWithProofs)
 
@@ -470,7 +525,7 @@ func TestBuildAndVerifyParaHeaderProofLocal2(t *testing.T) {
 			// 	// Proof elements (hashes of siblings of inner nodes on the path to the leaf).
 			// 	Items []types.H256
 			// }
-			leafIndex := beefy.GetLeafIndexForBlockNumber(beefy.BEEFY_ACTIVATION_BLOCK, uint32(latestSignedCommitmentBlockNumber))
+			leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(beefy.BEEFY_ACTIVATION_BLOCK, uint32(latestSignedCommitmentBlockNumber))
 			// leafIndex := latestSignedCommitmentBlockNumber
 			mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
 			// mmrSize := mmr.LeafIndexToMMRSize(uint64(mmrBatchProof.Proof.LeafCount))
@@ -502,7 +557,7 @@ func TestBuildAndVerifyParaHeaderProofLocal2(t *testing.T) {
 }
 
 func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	if err != nil {
 		t.Logf("Connecting err: %v", err)
 	}
@@ -517,7 +572,7 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 
 	require.NoError(t, err)
 
-	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
+	t.Logf("subscribed to %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
 
 	defer sub.Unsubscribe()
 
@@ -561,7 +616,7 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 			// t.Logf("toBlockNumber: %d", toBlockNumber)
 			t.Logf("toBlockHash: %#x", latestSignedCommitmentBlockHash)
 
-			changeSets, err := beefy.QueryParaChainStorage(api, LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
+			changeSets, err := beefy.QueryParachainStorage(api, beefy.LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
 			require.NoError(t, err)
 			t.Logf("changeSet len: %d", len(changeSets))
 			var targetRelayChainBlockHeights []uint64
@@ -599,7 +654,7 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 			// verify mmr batch proof
 			// leafCount := mmrBatchProof.Proof.LeafCount
 			// mmrSize := mmr.LeafIndexToMMRSize(uint64(leafCount))
-			leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber)
+			leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber)
 			mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
 			t.Logf("beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber): %d", leafIndex)
 			t.Logf("mmr.LeafIndexToMMRSize(uint64(leafIndex)): %d", mmrSize)
@@ -635,13 +690,13 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 				targetLeafBlockHash, err := api.RPC.Chain.GetBlockHash(targetLeafIndex)
 				require.NoError(t, err)
 				t.Logf("targetLeafIndex: %d targetLeafBlockHash: %#x", leafIndex, targetLeafBlockHash)
-				paraChainIds, err := beefy.GetParaChainIDs(api, targetLeafBlockHash)
+				paraChainIds, err := beefy.GetParachainIds(api, targetLeafBlockHash)
 				require.NoError(t, err)
 				t.Logf("paraChainIds: %+v", paraChainIds)
 				var paraChainHeaderMap = make(map[uint32][]byte, len(paraChainIds))
 				//find relayer header that includes all the target parachain header
 				for _, paraChainId := range paraChainIds {
-					paraChainHeader, err := beefy.GetParaChainHeader(api, uint32(paraChainId), targetLeafBlockHash)
+					paraChainHeader, err := beefy.GetParachainHeader(api, uint32(paraChainId), targetLeafBlockHash)
 					require.NoError(t, err)
 					// t.Logf("paraChainId: %d", paraChainId)
 					t.Logf("paraChainId: %d paraChainHeader: %#x", paraChainId, paraChainHeader)
@@ -712,6 +767,7 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 				t.Logf("mmrBatchProof.Leaves[i].ParachainHeads: %#x", mmrLeafParachainHeads)
 				t.Log("------------------------------------------------------------------------------------")
 
+				// verify solochain header,the leaf parent hash == blake2b256(scale.encode(solochain header))
 				targetLeafHeader, err := api.RPC.Chain.GetHeader(targetLeafBlockHash)
 				require.NoError(t, err)
 				t.Logf("targetLeafHeader: %+v", targetLeafHeader)
@@ -747,54 +803,159 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 	}
 }
 
-func TestQueryStorageRococo(t *testing.T) {
-	relayApi, err := gsrpc.NewSubstrateAPI(ROCOCO_ENDPOIN)
-	require.NoError(t, err)
-
-	var startBlockNumber = 3707562
-	t.Logf("startBlockNumber: %d", startBlockNumber)
-	t.Logf("startBlockNumber+1: %d", startBlockNumber+1)
-	startFinalizedHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(startBlockNumber + 1))
-	require.NoError(t, err)
-	t.Logf("startFinalizedHash: %#x", startFinalizedHash)
-
-	var endBlockNumber = 3707570
-	t.Logf("endBlockNumber: %d", endBlockNumber)
-	endFinalizedHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(endBlockNumber))
-	require.NoError(t, err)
-	t.Logf("endBlockNumber: %#x", endFinalizedHash)
-
-	var paraHeaderKeys []types.StorageKey
-
-	// create full storage key for our own paraId
-	keyPrefix := beefy.CreateStorageKeyPrefix("Paras", "Heads")
-	t.Logf("keyPrefix: %s", codec.HexEncodeToString(keyPrefix[:]))
-	// so we can query all blocks from lastfinalized to latestBeefyHeight
-	t.Logf("ROCOCO_PARACHAIN_ID: %d", ROCOCO_ROCKMIN_ID)
-	encodedParaID, err := codec.Encode(ROCOCO_ROCKMIN_ID)
-	t.Logf("encodedParaID: %#x", encodedParaID)
-	require.NoError(t, err)
-
-	twoXHash := xxhash.New64(encodedParaID).Sum(nil)
-	t.Logf("encodedParaID twoXHash: %#x", twoXHash)
-	// full key path in the storage source: https://www.shawntabrizi.com/assets/presentations/substrate-storage-deep-dive.pdf
-	// xx128("Paras") + xx128("Heads") + xx64(Encode(paraId)) + Encode(paraId)
-	fullKey := append(append(keyPrefix, twoXHash[:]...), encodedParaID...)
-	t.Logf("fullKey: %#x", fullKey)
-	paraHeaderKeys = append(paraHeaderKeys, fullKey)
-
-	var changSet []types.StorageChangeSet
-
-	for i := startBlockNumber + 1; i <= endBlockNumber; i++ {
-		blockHash, err := relayApi.RPC.Chain.GetBlockHash(uint64(i))
-		t.Logf("blockHash: %#x", blockHash)
-		require.NoError(t, err)
-		cs, err := relayApi.RPC.State.QueryStorageAt(paraHeaderKeys, blockHash)
-		require.NoError(t, err)
-		t.Logf("cs: %+v", cs)
-		changSet = append(changSet, cs...)
-		// t.Logf("changeSet: %#v", changeSet)
-
+func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
+	if err != nil {
+		t.Logf("Connecting err: %v", err)
 	}
-	t.Logf("changeSet: %+v", changSet)
+	ch := make(chan interface{})
+	sub, err := api.Client.Subscribe(
+		context.Background(),
+		"beefy",
+		"subscribeJustifications",
+		"unsubscribeJustifications",
+		"justifications",
+		ch)
+
+	require.NoError(t, err)
+
+	t.Logf("subscribed to %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
+
+	defer sub.Unsubscribe()
+
+	timeout := time.After(24 * time.Hour)
+	received := 0
+	var preBlockNumber uint32
+	var preBloackHash types.Hash
+	for {
+		select {
+		case msg := <-ch:
+			t.Logf("encoded msg: %s", msg)
+
+			s := &beefy.VersionedFinalityProof{}
+			err := codec.DecodeFromHex(msg.(string), s)
+			if err != nil {
+				panic(err)
+			}
+
+			t.Logf("decoded msg: %+v\n", s)
+			latestSignedCommitmentBlockNumber := s.SignedCommitment.Commitment.BlockNumber
+			// t.Logf("blockNumber: %d\n", latestBlockNumber)
+			latestSignedCommitmentBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(latestSignedCommitmentBlockNumber))
+			require.NoError(t, err)
+			t.Logf("latestSignedCommitmentBlockNumber: %d latestSignedCommitmentBlockHash: %#x", latestSignedCommitmentBlockNumber, latestSignedCommitmentBlockHash)
+
+			if received == 0 {
+				t.Log("First received signed commitment,init client state and need to wait next msg!")
+				preBlockNumber = latestSignedCommitmentBlockNumber
+				preBloackHash = latestSignedCommitmentBlockHash
+				received++
+				continue
+			}
+
+			fromBlockNumber := preBlockNumber + 1
+			t.Logf("fromBlockNumber: %d toBlockNumber: %d", fromBlockNumber, latestSignedCommitmentBlockNumber)
+
+			fromBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(fromBlockNumber))
+			require.NoError(t, err)
+			t.Logf("fromBlockHash: %#x ", fromBlockHash)
+			t.Logf("preSignedCommitmentBloackHash: %#x ", preBloackHash)
+			// t.Logf("toBlockNumber: %d", toBlockNumber)
+			t.Logf("toBlockHash: %#x", latestSignedCommitmentBlockHash)
+
+			changeSets, err := beefy.QueryParachainStorage(api, beefy.LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
+			require.NoError(t, err)
+			t.Logf("changeSet len: %d", len(changeSets))
+			var targetRelayChainBlockHeights []uint64
+			for _, changeSet := range changeSets {
+				header, err := api.RPC.Chain.GetHeader(changeSet.Block)
+				require.NoError(t, err)
+				// t.Logf("fromBlockHash: %#x ", fromFinalizedHash)
+				t.Logf("changeSet blockHash: %d changeSet blockHash: %#x", header.Number, changeSet.Block)
+				hexStr, err := json.Marshal(changeSet.Changes)
+				require.NoError(t, err)
+				t.Logf("changeSet changes: %s", hexStr)
+				for _, change := range changeSet.Changes {
+
+					t.Logf("change.StorageKey: %#x", change.StorageKey)
+					t.Log("change.HasStorageData: ", change.HasStorageData)
+					t.Logf("change.HasStorageData: %#x", change.StorageData)
+				}
+				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint64(header.Number))
+
+			}
+
+			// build mmr proofs for leaves containing target paraId
+			mmrBatchProof, err := beefy.BuildMMRBatchProof(api, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
+			require.NoError(t, err)
+			// t.Logf("mmrBatchProof: %+v", mmrBatchProof)
+			t.Logf("mmrBatchProof.BlockHash: %#x", mmrBatchProof.BlockHash)
+			t.Logf("mmrBatchProof leaves len: %d", len(mmrBatchProof.Leaves))
+			for _, leaf := range mmrBatchProof.Leaves {
+				t.Logf("mmrBatchProof leaf: %+v", leaf)
+			}
+			t.Logf("targetRelayChainBlockHeights: %+v", targetRelayChainBlockHeights)
+			t.Logf("The indexes of the leaf the proof is for: %+v", mmrBatchProof.Proof.LeafIndex)
+			t.Logf("Number of leaves in MMR, when the proof was generated: %d", mmrBatchProof.Proof.LeafCount)
+
+			// verify mmr batch proof
+			// leafCount := mmrBatchProof.Proof.LeafCount
+			// mmrSize := mmr.LeafIndexToMMRSize(uint64(leafCount))
+			leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber)
+			mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
+			t.Logf("beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber): %d", leafIndex)
+			t.Logf("mmr.LeafIndexToMMRSize(uint64(leafIndex)): %d", mmrSize)
+
+			//verify mmr batch proof
+			t.Log("---  begin to verify mmr batch proof  ---")
+			result, err := beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0],
+				mmrSize, mmrBatchProof.Leaves, mmrBatchProof.Proof)
+			require.NoError(t, err)
+			t.Logf("beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0], mmrSize,mmrBatchProof.Leaves, mmrBatchProof.Proof) result: %+v", result)
+			require.True(t, result)
+			t.Log("---  end to verify mmr batch proof  ---\n")
+
+			leafLen := len(mmrBatchProof.Leaves)
+			t.Logf("leaf num: %d", leafLen)
+			//verify relaychain header/solochain header
+
+			t.Log("---  begin to verify solochain header  ---")
+			// build solochain header map
+			solochainHeaderMap, err := beefy.BuildSolochainHeaderMap(api, mmrBatchProof.Proof.LeafIndex)
+			require.NoError(t, err)
+			t.Logf("solochainHeaderMap: %+v", solochainHeaderMap)
+
+			// verify solochain and proof
+			ret, err := beefy.VerifySolochainHeader(mmrBatchProof.Leaves, solochainHeaderMap)
+			require.NoError(t, err)
+			t.Logf("beefy.VerifySolochainHeader(mmrBatchProof.Leaves,solochainHeaderMap) result: %+v", ret)
+			require.True(t, ret)
+			t.Log("---  end to verify solochain header   ---\n")
+
+			t.Log("---  begin to verify parachain header  ---")
+
+			// build parachain header proof and verify that proof
+			parachainHeaderMap, err := beefy.BuildParachainHeaderMap(api, mmrBatchProof.Proof.LeafIndex, beefy.LOCAL_PARACHAIN_ID)
+			require.NoError(t, err)
+			t.Logf("parachainHeaderMap: %+v", parachainHeaderMap)
+			ret, err = beefy.VerifyParachainHeader(mmrBatchProof.Leaves, parachainHeaderMap)
+			require.NoError(t, err)
+			t.Logf("beefy.VerifyParachainHeader(mmrBatchProof.Leaves, parachainHeaderMap) result: %+v", ret)
+			require.True(t, ret)
+			t.Log("---  end to verify parachain header  ---")
+
+			// save latestSignedCommitment for next verify
+			preBlockNumber = latestSignedCommitmentBlockNumber
+			preBloackHash = latestSignedCommitmentBlockHash
+
+			received++
+
+			if received >= 6 {
+				return
+			}
+		case <-timeout:
+			t.Logf("timeout reached without getting 2 notifications from subscription")
+			return
+		}
+	}
 }

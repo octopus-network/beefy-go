@@ -28,8 +28,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// var beefyActivationBlock = 0
-
 func TestMMRCodec(t *testing.T) {
 
 	encodedMMRLeaf1 := "0xc50100430a0000fa6b428b97f17eb3c26b5ff93ac4aab01d025ada186dee56001b50c46c3eb6d1070100000000000005000000304803fa5a91d9852caafe04b4b867a4ed27a07a5bee3d1507b4b187a68777a2b5dc72dfa5727322357a8fc8bbf2333c537d8359697a87c226b688356a193876"
@@ -93,33 +91,9 @@ func TestMMRCodec(t *testing.T) {
 	err = codec.DecodeFromHex(tmp.Proof, decodedProof2)
 	require.NoError(t, err)
 	t.Logf("decodedProof2: %+v", decodedProof2)
-
 }
 
-func TestGetLeafIndexForBlockNumber(t *testing.T) {
-	// beefy activate block
-	var beefyActivationBlock uint32 = 0
-
-	// the first signed commitment blocknumber
-	var signedCommitmentBlockNumber uint32 = 1
-
-	for i := 0; i < 10; i++ {
-		leafIndex := beefy.GetLeafIndexForBlockNumber(beefyActivationBlock, signedCommitmentBlockNumber)
-		t.Logf("beefyActivationBlock: %d, signedCommitmentBlockNumber: %d leafIndex: %d", beefyActivationBlock, signedCommitmentBlockNumber, leafIndex)
-		signedCommitmentBlockNumber = signedCommitmentBlockNumber + 8
-	}
-
-	// if beefyActivationBlock is not 0
-	beefyActivationBlock = 88
-	// the first signed commitment blocknumber
-	signedCommitmentBlockNumber = 89
-	for i := 0; i < 10; i++ {
-		leafIndex := beefy.GetLeafIndexForBlockNumber(beefyActivationBlock, signedCommitmentBlockNumber)
-		t.Logf("beefyActivationBlock: %d, signedCommitmentBlockNumber: %d leafIndex: %d", beefyActivationBlock, signedCommitmentBlockNumber, leafIndex)
-		signedCommitmentBlockNumber = signedCommitmentBlockNumber + 8
-	}
-
-}
+//TODO: use static data to test
 func TestVerifyMMR(t *testing.T) {
 	encodeVersionedFinalityProof := "0x01046d68807a9e44f5ce2abbbb835d421aa30fbd208128ae6382094eb7b5c0e06c5bed30ae630f0000890100000000000004b8050000001012f5b0f14c5d821bb57e136a35eedc1e1a594a03729c3c67ff19a0c0c2c9696a0b27cbed5f5e2f1484a23b01a0787c4b04fa85a1003a2170f638e1167994030201d91d5fd8305c7d55860cf4e82e7ca81ed32ea106df06d4590a45a98ee01c14797d8267f6db5c9a884cdb10389d5602eb2a6d8283079c8fbd011c54903095e62b0019f246b1f8ee13bfa73a5c436925298bdf0c3fb284fdb8c7ae70031cfb1c15fc18651ef32ce6cd23eee63f513bb1222d99b7f45f7ce7989b18d3c1040d0a02b70166ca3a7a8eefab0df53b4ca0630de24715ab5aefe15f197b6f9c74e33792082c5e7d48be6da4689a5cacdba73be6157eab6294886da8b64725862d478449786900"
 	decodedVersionedFinalityProof := &beefy.VersionedFinalityProof{}
@@ -135,7 +109,7 @@ func TestVerifyMMR(t *testing.T) {
 	t.Logf("blockNumber: %d", blockNumber)
 	bockHash := "0x63c06b2b5d56389ee657c47042471532b24a5be63c26e2deb0720d614c9aa444"
 	t.Logf("bockHash: %s", bockHash)
-	leafIndex := beefy.GetLeafIndexForBlockNumber(0, blockNumber)
+	leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(0, blockNumber)
 	t.Logf("leafIndex: %d", leafIndex)
 	generateMMRProofRespJson := ` {
 		"blockHash": "0x63c06b2b5d56389ee657c47042471532b24a5be63c26e2deb0720d614c9aa444",
@@ -199,204 +173,9 @@ func TestVerifyMMR(t *testing.T) {
 	t.Logf("reflect.DeepEqual result :%#v", ret2)
 }
 
-func TestBuildMMRBatchProof(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
-	require.NoError(t, err)
-	// block hash 0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970
-	// blockHash, err := codec.HexDecodeString("0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970")
-	hexStr := "0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970"
-	require.NoError(t, err)
-	idxes := []uint64{3014, 3016, 3018, 3020}
-	blockHash, err := types.NewHashFromHexString(hexStr)
-	require.NoError(t, err)
-	batchProof, err := beefy.BuildMMRBatchProof(api, &blockHash, idxes)
-	require.NoError(t, err)
-	t.Logf("BuildMMRBatchProof: %+v", batchProof)
-}
-
-func TestBuildAndVerifyMMRProofLocal(t *testing.T) {
-	encodeVersionedFinalityProof := "0x01046d688092f9d4139eed1e8e02af86f31b70877a80c22f2eb52707e07b6e787b7bdc27506f120000d70100000000000004e80500000010a195e47c9ad10b666cd7c155cacfdd502e14af049957b10213c5c671bc433dff30dcf7cf7b4b7a34bb9249676a33876f719ec92fcbd04b1c99e240705b1513f801d8edd31f6ba7cd207f94422454584f4f00ab190ebec1176b3be56544f349d8145468c3da686d3bc148c7576ce33be5b1ad913814da4af659c825cc4f4d829186003907980301b9c7415df46824b99da4fb3aa55c55f814bcc17e139ffff1b8469f0edf4b27b8eadbc68e7ebf6f0f0bcd36a159333c89422f7c074db01f0382aefe01bfacc658e45c1950dc4e96ea40b7b5a890b238edebce6b7e56876d5fae49659e6b345e51036a851b40d180884ea0fd68d32896ff3acf9d3f7085a5cedaa57e5e00"
-	decodedVersionedFinalityProof := &beefy.VersionedFinalityProof{}
-	err := codec.DecodeFromHex(encodeVersionedFinalityProof, decodedVersionedFinalityProof)
-	require.NoError(t, err)
-	t.Logf("decoded SignedCommitment: %+v", decodedVersionedFinalityProof)
-	payload := decodedVersionedFinalityProof.SignedCommitment.Commitment.Payload[0]
-	mmrRootID := payload.ID
-	t.Logf("mmrRootID: %s", mmrRootID)
-	mmrRoot := payload.Data
-	t.Logf("mmrRoot:%#x", mmrRoot)
-	blockNumber := decodedVersionedFinalityProof.SignedCommitment.Commitment.BlockNumber
-	t.Logf("blockNumber: %d", blockNumber)
-	leafIndex := beefy.GetLeafIndexForBlockNumber(0, blockNumber)
-	t.Logf("leafIndex: %d", leafIndex)
-
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
-	require.NoError(t, err)
-	// blockHash := "0x729d5e86a4ec7ad0a5f7fa18357256c3c1c110407be4164dcf88ec33c2b4ed98"
-	blockHash, err := api.RPC.Chain.GetBlockHash(uint64(blockNumber))
-	require.NoError(t, err)
-	t.Logf("bockHash: %#x", blockHash)
-
-	// retBlockHash, mmrLeaf, mmrLeafProof, err := beefy.BuildMMRProof(api, leafIndex, blockHash)
-	retBlockHash, mmrLeaf, proof, err := beefy.BuildMMRProof(api, uint64(blockNumber), blockHash)
-	var mmrLeafProof = make([][]byte, len(proof.Items))
-	for i := 0; i < len(proof.Items); i++ {
-		mmrLeafProof[i] = proof.Items[i][:]
-	}
-	require.NoError(t, err)
-	t.Logf("\nrethash: %#x\nmmrLeaf: %+v\nmmrLeafProof: %+v", retBlockHash, mmrLeaf, mmrLeafProof)
-	// mmrSize := mmr.LeafIndexToMMRSize(leafIndex)
-	mmrSize := mmr.LeafIndexToMMRSize(leafIndex + 1)
-	t.Logf("mmrSize:%d\n ", mmrSize)
-	result, err := beefy.VerifyMMRProof(decodedVersionedFinalityProof.SignedCommitment, mmrSize, leafIndex, mmrLeaf, mmrLeafProof)
-	require.NoError(t, err)
-	t.Logf("verify mmr proof result: %#v", result)
-
-}
-
-func TestVerifyBatchProofLocal(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
-	if err != nil {
-		t.Logf("Connecting err: %v", err)
-	}
-	ch := make(chan interface{})
-	sub, err := api.Client.Subscribe(
-		context.Background(),
-		"beefy",
-		"subscribeJustifications",
-		"unsubscribeJustifications",
-		"justifications",
-		ch)
-
-	require.NoError(t, err)
-
-	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
-
-	defer sub.Unsubscribe()
-
-	timeout := time.After(24 * time.Hour)
-	received := 0
-	var preBlockNumber uint32
-	var preBloackHash types.Hash
-	for {
-		select {
-		case msg := <-ch:
-			t.Logf("encoded msg: %s", msg)
-
-			s := &beefy.VersionedFinalityProof{}
-			err := codec.DecodeFromHex(msg.(string), s)
-			if err != nil {
-				panic(err)
-			}
-
-			t.Logf("decoded msg: %+v\n", s)
-			latestSignedCommitmentBlockNumber := s.SignedCommitment.Commitment.BlockNumber
-			// t.Logf("blockNumber: %d\n", latestBlockNumber)
-			latestSignedCommitmentBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(latestSignedCommitmentBlockNumber))
-			require.NoError(t, err)
-			t.Logf("latestSignedCommitmentBlockNumber: %d latestSignedCommitmentBlockHash: %#x", latestSignedCommitmentBlockNumber, latestSignedCommitmentBlockHash)
-
-			if received == 0 {
-				t.Log("First received signed commitment,init client state and need to wait next msg!")
-				preBlockNumber = latestSignedCommitmentBlockNumber
-				preBloackHash = latestSignedCommitmentBlockHash
-				received++
-				continue
-			}
-
-			fromBlockNumber := preBlockNumber + 1
-			t.Logf("fromBlockNumber: %d toBlockNumber: %d", fromBlockNumber, latestSignedCommitmentBlockNumber)
-
-			fromBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(fromBlockNumber))
-			require.NoError(t, err)
-			t.Logf("fromBlockHash: %#x ", fromBlockHash)
-			t.Logf("preSignedCommitmentBloackHash: %#x ", preBloackHash)
-			// t.Logf("toBlockNumber: %d", toBlockNumber)
-			t.Logf("toBlockHash: %#x", latestSignedCommitmentBlockHash)
-
-			changeSets, err := beefy.QueryParaChainStorage(api, LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
-			require.NoError(t, err)
-			t.Logf("changeSet len: %d", len(changeSets))
-			var targetRelayChainBlockHeights []uint64
-			for _, changeSet := range changeSets {
-				header, err := api.RPC.Chain.GetHeader(changeSet.Block)
-				require.NoError(t, err)
-				// t.Logf("fromBlockHash: %#x ", fromFinalizedHash)
-				t.Logf("changeSet blockHash: %d changeSet blockHash: %#x", header.Number, changeSet.Block)
-				hexStr, err := json.Marshal(changeSet.Changes)
-				require.NoError(t, err)
-				t.Logf("changeSet changes: %s", hexStr)
-				for _, change := range changeSet.Changes {
-
-					t.Logf("change.StorageKey: %#x", change.StorageKey)
-					t.Log("change.HasStorageData: ", change.HasStorageData)
-					t.Logf("change.HasStorageData: %#x", change.StorageData)
-				}
-				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint64(header.Number))
-
-			}
-
-			// build mmr proofs for leaves containing target paraId
-			mmrBatchProof, err := beefy.BuildMMRBatchProof(api, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
-			require.NoError(t, err)
-			// t.Logf("mmrBatchProof: %+v", mmrBatchProof)
-			t.Logf("mmrBatchProof.BlockHash: %#x", mmrBatchProof.BlockHash)
-			t.Logf("mmrBatchProof leaves len: %d", len(mmrBatchProof.Leaves))
-			for _, leaf := range mmrBatchProof.Leaves {
-				t.Logf("mmrBatchProof leaf: %+v", leaf)
-			}
-			t.Logf("targetRelayChainBlockHeights: %+v", targetRelayChainBlockHeights)
-			t.Logf("The indexes of the leaf the proof is for: %+v", mmrBatchProof.Proof.LeafIndex)
-			t.Logf("Number of leaves in MMR, when the proof was generated: %d", mmrBatchProof.Proof.LeafCount)
-			// leafCount := mmrBatchProof.Proof.LeafCount
-			// mmrSize := mmr.LeafIndexToMMRSize(uint64(leafCount))
-			leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber)
-			mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
-			t.Logf("beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber): %d", leafIndex)
-			t.Logf("mmr.LeafIndexToMMRSize(uint64(leafIndex)): %d", mmrSize)
-
-			var mmrLeafProof = make([][]byte, len(mmrBatchProof.Proof.Items))
-			for i := 0; i < len(mmrBatchProof.Proof.Items); i++ {
-				mmrLeafProof[i] = mmrBatchProof.Proof.Items[i][:]
-			}
-
-			var mmrLeaves = make([]merkletypes.Leaf, len(mmrBatchProof.Leaves))
-			for i := 0; i < len(mmrBatchProof.Leaves); i++ {
-				// scale encode the mmr leaf
-				encodedMMRLeaf, err := codec.Encode(mmrBatchProof.Leaves[i])
-				require.NoError(t, err)
-				log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
-				mmrLeaf := merkletypes.Leaf{
-					Hash:  crypto.Keccak256(encodedMMRLeaf),
-					Index: uint64(mmrBatchProof.Proof.LeafIndex[i]),
-				}
-				mmrLeaves[i] = mmrLeaf
-			}
-			mmrProof := mmr.NewProof(mmrSize, mmrLeafProof, mmrLeaves, hasher.Keccak256Hasher{})
-			calMMRRoot, err := mmrProof.CalculateRoot()
-			require.NoError(t, err)
-			t.Log("------------------------------------------------------------------------------------")
-			t.Logf("cal mmr root:%#x", calMMRRoot)
-			t.Logf("payload.Data:%#x", s.SignedCommitment.Commitment.Payload[0].Data)
-			t.Log("------------------------------------------------------------------------------------")
-			// save latestSignedCommitment for next verify
-			preBlockNumber = latestSignedCommitmentBlockNumber
-			preBloackHash = latestSignedCommitmentBlockHash
-
-			received++
-
-			if received >= 10 {
-				return
-			}
-		case <-timeout:
-			t.Logf("timeout reached without getting 2 notifications from subscription")
-			return
-		}
-	}
-}
-
+// verify relaychain header and parachain header
 func TestVerifyMMRLocal(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	if err != nil {
 		t.Logf("Connecting err: %v", err)
 	}
@@ -414,7 +193,7 @@ func TestVerifyMMRLocal(t *testing.T) {
 		t.Logf("skipping since beefy module is not available")
 	}
 
-	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
+	t.Logf("subscribed to %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
 	// assert.NoError(t, err)
 	defer sub.Unsubscribe()
 
@@ -438,7 +217,8 @@ func TestVerifyMMRLocal(t *testing.T) {
 			// t.Logf("blockNumber: %d", blockNumber)
 			singedCommitmentBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(singedCommitmentblockNumber))
 			require.NoError(t, err)
-			t.Logf("singedCommitmentblockNumber: %d singedCommitmentBlockHash: %#x", singedCommitmentblockNumber, singedCommitmentBlockHash)
+			t.Logf("singedCommitmentblockNumber: %d singedCommitmentBlockHash: %#x", singedCommitmentblockNumber,
+				singedCommitmentBlockHash)
 
 			// if received == 0 {
 			// 	t.Log("First received signed commitment,init client state and need to wait next msg!")
@@ -495,7 +275,7 @@ func TestVerifyMMRLocal(t *testing.T) {
 				// t.Log("------------------------------------------------------------------------------------")
 				// t.Log("beefy.VerifyMMRProof(s.SignedCommitment, mmrSize3, leafIndex, mmrLeaf, mmrLeafProof)")
 				t.Log("------------------------------------------------------------------------------------")
-				result3, err := beefy.VerifyMMRProof(s.SignedCommitment, mmrSize, leafIndex, mmrLeaf, mmrLeafProofItems)
+				result3, err := beefy.VerifyMMRProof(s.SignedCommitment.Commitment, mmrSize, leafIndex, mmrLeaf, mmrLeafProofItems)
 				t.Log("------------------------------------------------------------------------------------")
 				require.NoError(t, err)
 				require.True(t, result3)
@@ -512,12 +292,12 @@ func TestVerifyMMRLocal(t *testing.T) {
 				leafBlockHash, err := api.RPC.Chain.GetBlockHash(leafIndex)
 				require.NoError(t, err)
 				t.Logf("leafBlockNumber: %d leafBlockHash: %#x", leafIndex, leafBlockHash)
-				paraChainIds, err := beefy.GetParaChainIDs(api, leafBlockHash)
+				paraChainIds, err := beefy.GetParachainIds(api, leafBlockHash)
 				require.NoError(t, err)
 				t.Logf("paraChainIds: %+v", paraChainIds)
 				var paraChainHeaderMap = make(map[uint32][]byte, len(paraChainIds))
 				for _, paraChainId := range paraChainIds {
-					paraChainHeader, err := beefy.GetParaChainHeader(api, uint32(paraChainId), leafBlockHash)
+					paraChainHeader, err := beefy.GetParachainHeader(api, uint32(paraChainId), leafBlockHash)
 					require.NoError(t, err)
 					// t.Logf("paraChainId: %d", paraChainId)
 					t.Logf("paraChainId: %d paraChainHeader: %#x", paraChainId, paraChainHeader)
@@ -587,8 +367,10 @@ func TestVerifyMMRLocal(t *testing.T) {
 				require.NoError(t, err)
 				t.Logf("leafHeader: %+v", leafHeader)
 
+				// encode
 				ecodedLeafHeader, err := codec.Encode(leafHeader)
 				require.NoError(t, err)
+				// get blake2b256 hash
 				// targetRelayHeaderRehash, err := hasher.Keccak256Hasher{}.Hash(encodeTargetRelayerHeader)
 				blake2b256, err = hash.NewBlake2b256(nil)
 				require.NoError(t, err)
@@ -597,7 +379,6 @@ func TestVerifyMMRLocal(t *testing.T) {
 				require.NoError(t, err)
 				t.Logf("leafHeaderRehash: %#x", leafHeaderRehash)
 				t.Logf("\nleafIndex: %d mmrLeaf ParentNumber: %d leafBlockHash: %#x\n mmrLeaf parent Hash: %#x\n leafHeader: %+v", leafIndex, mmrLeaf.ParentNumberAndHash.ParentNumber, leafBlockHash, mmrLeaf.ParentNumberAndHash.Hash, leafHeader)
-
 			}
 
 			received++
@@ -612,14 +393,15 @@ func TestVerifyMMRLocal(t *testing.T) {
 	}
 }
 
+// verify mmr proof,relaychain header,parachain header proof and parachain state proof
 func TestVerifyMMRLocal2(t *testing.T) {
 
-	relayApi, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	relayApi, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)
-	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
-	paraChainApi, err := gsrpc.NewSubstrateAPI(LOCAL_PARACHAIN_ENDPOINT)
+	t.Logf("subscribed to %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
+	paraChainApi, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_PARACHAIN_ENDPOINT)
 	require.NoError(t, err)
-	t.Logf("subscribed to %s\n", LOCAL_PARACHAIN_ENDPOINT)
+	t.Logf("subscribed to %s\n", beefy.LOCAL_PARACHAIN_ENDPOINT)
 	ch := make(chan interface{})
 	sub, err := relayApi.Client.Subscribe(
 		context.Background(),
@@ -653,7 +435,7 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			//target blocknumber
 			targetBlockNumber := singedCommitmentblockNumber - 5
 			// leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), singedCommitmentblockNumber)
-			leafIndex := beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), targetBlockNumber)
+			leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(uint32(beefy.BEEFY_ACTIVATION_BLOCK), targetBlockNumber)
 
 			// t.Logf("mmrSize:%d\n ", mmrSize)
 			// retHash, mmrLeaf, proof, err := beefy.BuildMMRProof(api, leafIndex, blockHash)
@@ -680,7 +462,7 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			// require.NoError(t, err)
 			// t.Logf("verify mmr proof result: %#v", result1)
 			t.Log("--- Begin to verify relayer chain mmr proof ---")
-			result2, err := beefy.VerifyMMRProof(s.SignedCommitment, mmrSize2, leafIndex, mmrLeaf, mmrLeafProof)
+			result2, err := beefy.VerifyMMRProof(s.SignedCommitment.Commitment, mmrSize2, leafIndex, mmrLeaf, mmrLeafProof)
 			require.NoError(t, err)
 			t.Logf("verify mmr proof result: %#v", result2)
 			t.Log("--- End to verify relayer chain mmr proof --- \n")
@@ -700,7 +482,7 @@ func TestVerifyMMRLocal2(t *testing.T) {
 
 			// step3: verify parachain header at target height
 			t.Log("--- Begin to verify para chain header ---")
-			targetEncodedParaHeader, err := beefy.GetParaChainHeader(relayApi, uint32(LOCAL_PARACHAIN_ID), targetBlockHash)
+			targetEncodedParaHeader, err := beefy.GetParachainHeader(relayApi, uint32(beefy.LOCAL_PARACHAIN_ID), targetBlockHash)
 			// It`s possobile there is not parachain header at target height
 			require.NoError(t, err)
 			t.Logf("targetBlockHash: %#x\n targetParaHeader: %#x", targetBlockHash, targetEncodedParaHeader)
@@ -716,7 +498,7 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			// t.Logf("marShalTargetParaHeader: %#x", marShalTargetParaHeader)
 
 			// get parachain state proof at target height
-			targetParaHeaderStateProof, err := beefy.GetParaHeaderProof(relayApi, targetBlockHash, LOCAL_PARACHAIN_ID)
+			targetParaHeaderStateProof, err := beefy.GetParachainHeaderProof(relayApi, targetBlockHash, beefy.LOCAL_PARACHAIN_ID)
 			require.NoError(t, err)
 			t.Logf("targetParaHeaderStateProof: %+v", targetParaHeaderStateProof)
 			paraHeaderStateproofs := make([][]byte, len(targetParaHeaderStateProof.Proof))
@@ -731,7 +513,7 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			meta, err := relayApi.RPC.State.GetMetadataLatest()
 			require.NoError(t, err)
 			paraIdEncoded := make([]byte, 4)
-			binary.LittleEndian.PutUint32(paraIdEncoded, LOCAL_PARACHAIN_ID)
+			binary.LittleEndian.PutUint32(paraIdEncoded, beefy.LOCAL_PARACHAIN_ID)
 			targetParaHeaderKey, err := types.CreateStorageKey(meta, "Paras", "Heads", paraIdEncoded)
 			require.NoError(t, err)
 			log.Printf("targetParaHeaderKey: %#x", targetParaHeaderKey)
@@ -769,7 +551,7 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			t.Log("--- End to verify para chain header --- \n")
 
 			// step4: verify parachain data
-			t.Log("--- Begin to verify para chain data ---")
+			t.Log("--- Begin to verify para chain state proof ---")
 			t.Log("--- get parachain timestamp and proof from parachain ---")
 			require.NoError(t, err)
 			paraChainBlockHash, err := paraChainApi.RPC.Chain.GetBlockHash(uint64(targetDecodedParaHeader.Number))
@@ -777,7 +559,7 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			t.Logf("parachain height: %d,parachain BlockHash: %#x", targetDecodedParaHeader.Number, paraChainBlockHash)
 			paraTimestampStoragekey := beefy.CreateStorageKeyPrefix("Timestamp", "Now")
 			t.Logf("paraTimestampStoragekey: %#x", paraTimestampStoragekey)
-			timestamp, err := beefy.GetParaChainTimestamp(paraChainApi, paraChainBlockHash)
+			timestamp, err := beefy.GetTimestampValue(paraChainApi, paraChainBlockHash)
 			require.NoError(t, err)
 			// t.Logf("timestamp from parachain: ", timestamp)
 			t.Logf("timestamp from parachain: %d hex: %x", timestamp, timestamp)
@@ -828,18 +610,195 @@ func TestVerifyMMRLocal2(t *testing.T) {
 
 			err = timestampTrie.WriteDirty(database2)
 			require.NoError(t, err)
-			calParaHeaderStateRoot, err := timestampTrie.Hash()
+			rootHash, err := timestampTrie.Hash()
+			t.Logf("cal parachain state root from new trie tree(rootHash): %#x", rootHash)
 			require.NoError(t, err)
-			t.Logf("cal parachain state root from new trie tree: %s", calParaHeaderStateRoot)
+			marshalRootHash, err := trie_scale.Marshal(rootHash)
+			require.NoError(t, err)
+			t.Logf("cal parachain state root from new trie tree(marshalRootHash): %#x", marshalRootHash)
 			t.Logf("targetDecodeParaHeader.StateRoot: %#x", targetDecodedParaHeader.StateRoot)
 
 			err = trie_proof.Verify(proofs, targetDecodedParaHeader.StateRoot[:], paraTimestampStoragekey, marshalTimestamp)
 			require.NoError(t, err)
 			t.Log("trie_proof.Verify(proofs, targetDecodedParaHeader.StateRoot[:], paraTimestampStoragekey, marshalTimestamp) successlly!")
-			t.Log("--- End to verify para chain data --- \n")
+			t.Log("--- End to verify para chain state proof --- \n")
 
 			received++
-			if received >= 10 {
+			if received >= 5 {
+				return
+			}
+		case <-timeout:
+			t.Logf("timeout reached without getting 2 notifications from subscription")
+			return
+		}
+	}
+}
+
+func TestBuildMMRBatchProof(t *testing.T) {
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
+	require.NoError(t, err)
+	// block hash 0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970
+	// blockHash, err := codec.HexDecodeString("0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970")
+	// hexStr := "0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970"
+	// blockHash, err := types.NewHashFromHexString(hexStr)
+	blockHash, err := api.RPC.Chain.GetFinalizedHead()
+	require.NoError(t, err)
+	t.Logf("blockHash: %#x", blockHash)
+	header, err := api.RPC.Chain.GetHeader(blockHash)
+	require.NoError(t, err)
+	t.Logf("header: %+v", header)
+	// require.NoError(t, err)
+	// t.Logf("blockHash: %#x", blockHash)
+	idxes := []uint64{uint64(header.Number) - 6, uint64(header.Number) - 4, uint64(header.Number) - 2}
+	t.Logf("idxes: %+v", idxes)
+	require.NoError(t, err)
+	batchProof, err := beefy.BuildMMRBatchProof(api, &blockHash, idxes)
+	require.NoError(t, err)
+	t.Logf("BuildMMRBatchProof: %+v", batchProof)
+}
+
+func TestVerifyMMRBatchProofLocal(t *testing.T) {
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
+	if err != nil {
+		t.Logf("Connecting err: %v", err)
+	}
+	ch := make(chan interface{})
+	sub, err := api.Client.Subscribe(
+		context.Background(),
+		"beefy",
+		"subscribeJustifications",
+		"unsubscribeJustifications",
+		"justifications",
+		ch)
+
+	require.NoError(t, err)
+
+	t.Logf("subscribed to %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
+
+	defer sub.Unsubscribe()
+
+	timeout := time.After(24 * time.Hour)
+	received := 0
+	var preBlockNumber uint32
+	var preBloackHash types.Hash
+	for {
+		select {
+		case msg := <-ch:
+			t.Logf("encoded msg: %s", msg)
+
+			s := &beefy.VersionedFinalityProof{}
+			err := codec.DecodeFromHex(msg.(string), s)
+			if err != nil {
+				panic(err)
+			}
+
+			t.Logf("decoded msg: %+v\n", s)
+			latestSignedCommitmentBlockNumber := s.SignedCommitment.Commitment.BlockNumber
+			// t.Logf("blockNumber: %d\n", latestBlockNumber)
+			latestSignedCommitmentBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(latestSignedCommitmentBlockNumber))
+			require.NoError(t, err)
+			t.Logf("latestSignedCommitmentBlockNumber: %d latestSignedCommitmentBlockHash: %#x", latestSignedCommitmentBlockNumber, latestSignedCommitmentBlockHash)
+
+			if received == 0 {
+				t.Log("First received signed commitment,init client state and need to wait next msg!")
+				preBlockNumber = latestSignedCommitmentBlockNumber
+				preBloackHash = latestSignedCommitmentBlockHash
+				received++
+				continue
+			}
+
+			fromBlockNumber := preBlockNumber + 1
+			t.Logf("fromBlockNumber: %d toBlockNumber: %d", fromBlockNumber, latestSignedCommitmentBlockNumber)
+
+			fromBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(fromBlockNumber))
+			require.NoError(t, err)
+			t.Logf("fromBlockHash: %#x ", fromBlockHash)
+			t.Logf("preSignedCommitmentBloackHash: %#x ", preBloackHash)
+			// t.Logf("toBlockNumber: %d", toBlockNumber)
+			t.Logf("toBlockHash: %#x", latestSignedCommitmentBlockHash)
+
+			changeSets, err := beefy.QueryParachainStorage(api, beefy.LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
+			require.NoError(t, err)
+			t.Logf("changeSet len: %d", len(changeSets))
+			var targetRelayChainBlockHeights []uint64
+			for _, changeSet := range changeSets {
+				header, err := api.RPC.Chain.GetHeader(changeSet.Block)
+				require.NoError(t, err)
+				// t.Logf("fromBlockHash: %#x ", fromFinalizedHash)
+				t.Logf("changeSet blockHash: %d changeSet blockHash: %#x", header.Number, changeSet.Block)
+				hexStr, err := json.Marshal(changeSet.Changes)
+				require.NoError(t, err)
+				t.Logf("changeSet changes: %s", hexStr)
+				for _, change := range changeSet.Changes {
+
+					t.Logf("change.StorageKey: %#x", change.StorageKey)
+					t.Log("change.HasStorageData: ", change.HasStorageData)
+					t.Logf("change.HasStorageData: %#x", change.StorageData)
+				}
+				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint64(header.Number))
+
+			}
+
+			// build mmr proofs for leaves containing target paraId
+			mmrBatchProof, err := beefy.BuildMMRBatchProof(api, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
+			require.NoError(t, err)
+			// t.Logf("mmrBatchProof: %+v", mmrBatchProof)
+			t.Logf("mmrBatchProof.BlockHash: %#x", mmrBatchProof.BlockHash)
+			t.Logf("mmrBatchProof leaves len: %d", len(mmrBatchProof.Leaves))
+			for _, leaf := range mmrBatchProof.Leaves {
+				t.Logf("mmrBatchProof leaf: %+v", leaf)
+			}
+			t.Logf("targetRelayChainBlockHeights: %+v", targetRelayChainBlockHeights)
+			t.Logf("The indexes of the leaf the proof is for: %+v", mmrBatchProof.Proof.LeafIndex)
+			t.Logf("Number of leaves in MMR, when the proof was generated: %d", mmrBatchProof.Proof.LeafCount)
+			// leafCount := mmrBatchProof.Proof.LeafCount
+			// mmrSize := mmr.LeafIndexToMMRSize(uint64(leafCount))
+			leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber)
+			mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
+			t.Logf("beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber): %d", leafIndex)
+			t.Logf("mmr.LeafIndexToMMRSize(uint64(leafIndex)): %d", mmrSize)
+
+			var mmrLeafProof = make([][]byte, len(mmrBatchProof.Proof.Items))
+			for i := 0; i < len(mmrBatchProof.Proof.Items); i++ {
+				mmrLeafProof[i] = mmrBatchProof.Proof.Items[i][:]
+			}
+
+			var mmrLeaves = make([]merkletypes.Leaf, len(mmrBatchProof.Leaves))
+			for i := 0; i < len(mmrBatchProof.Leaves); i++ {
+				// scale encode the mmr leaf
+				encodedMMRLeaf, err := codec.Encode(mmrBatchProof.Leaves[i])
+				require.NoError(t, err)
+				log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
+				mmrLeaf := merkletypes.Leaf{
+					Hash:  crypto.Keccak256(encodedMMRLeaf),
+					Index: uint64(mmrBatchProof.Proof.LeafIndex[i]),
+				}
+				mmrLeaves[i] = mmrLeaf
+			}
+
+			// CalculateRoot
+			mmrProof := mmr.NewProof(mmrSize, mmrLeafProof, mmrLeaves, hasher.Keccak256Hasher{})
+			calMMRRoot, err := mmrProof.CalculateRoot()
+			require.NoError(t, err)
+			t.Log("------------------------------------------------------------------------------------")
+			t.Logf("cal mmr root:%#x", calMMRRoot)
+			t.Logf("payload.Data:%#x", s.SignedCommitment.Commitment.Payload[0].Data)
+			t.Log("------------------------------------------------------------------------------------")
+
+			//verify mmr batch proof
+			result, err := beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0], mmrSize,
+				mmrBatchProof.Leaves, mmrBatchProof.Proof)
+			require.NoError(t, err)
+			t.Logf("beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0], mmrSize,mmrBatchProof.Leaves, mmrBatchProof.Proof) result: %+v", result)
+			require.True(t, result)
+
+			// save latestSignedCommitment for next verify
+			preBlockNumber = latestSignedCommitmentBlockNumber
+			preBloackHash = latestSignedCommitmentBlockHash
+
+			received++
+
+			if received >= 2 {
 				return
 			}
 		case <-timeout:

@@ -15,14 +15,22 @@ import (
 
 type Authorities = [][33]uint8
 
-type BeefyAuthoritySet struct {
-	// ID
-	Id uint64
-	// Number of validators in the set.
-	Len uint32
-	// Merkle Root Hash build from BEEFY uncompressed AuthorityIds.
-	Root [32]byte
-	// Root SizedByte32
+// type BeefyAuthoritySet struct {
+// 	// Id of the authority set, it should be strictly increasing
+// 	Id uint64 `json:"id,omitempty"`
+// 	// Number of validators in the set.
+// 	Len uint32 `json:"len,omitempty"`
+// 	// Merkle Root Hash build from BEEFY uncompressed AuthorityIds.
+// 	Root [32]byte
+// 	// Root SizedByte32
+// }
+
+// Signature with it`s index in merkle tree
+type Signature struct {
+	// signature leaf index in the merkle tree.
+	Index uint32 `json:"index,omitempty"`
+	// signature bytes
+	Signature []byte `json:"signature,omitempty"`
 }
 
 func GetBeefyAuthorities(blockHash types.Hash, api *gsrpc.SubstrateAPI, method string) ([][]byte, error) {
@@ -53,20 +61,21 @@ func GetBeefyAuthorities(blockHash types.Hash, api *gsrpc.SubstrateAPI, method s
 		return nil, fmt.Errorf("beefy authorities not found")
 	}
 	log.Printf("authority count: %d\n", len(authorities))
+
 	// Convert from ecdsa public key to ethereum address
-	var authorityEthereumAddresses [][]byte
+	var authorityEthAddresses [][]byte
 	for _, authority := range authorities {
 		// log.Printf("authority pubkey: %s\n", codec.HexEncodeToString(authority[:]))
 		pub, err := crypto.DecompressPubkey(authority[:])
 		if err != nil {
 			return nil, err
 		}
-		ethereumAddress := crypto.PubkeyToAddress(*pub)
+		ethAddress := crypto.PubkeyToAddress(*pub)
 		// log.Printf("authority ethereumAddress: %s\n", ethereumAddress)
-		authorityEthereumAddresses = append(authorityEthereumAddresses, ethereumAddress[:])
+		authorityEthAddresses = append(authorityEthAddresses, ethAddress[:])
 	}
 
-	return authorityEthereumAddresses, nil
+	return authorityEthAddresses, nil
 }
 
 func GetBeefyAuthoritySet(blockHash types.Hash, api *gsrpc.SubstrateAPI, method string) (types.BeefyNextAuthoritySet, error) {
@@ -102,35 +111,51 @@ func GetBeefyAuthoritySet(blockHash types.Hash, api *gsrpc.SubstrateAPI, method 
 	if !ok {
 		return authoritySet, fmt.Errorf("beefy authority set not found")
 	}
-	log.Printf("BeefyAuthoritySet on chain : %+v\n", authoritySet)
+	// log.Printf("BeefyAuthoritySet on chain : %+v\n", authoritySet)
 
 	return authoritySet, nil
 
 }
 
-func ConvertCommitment(sc types.SignedCommitment) ConvertedSignedCommitment {
-	var sigIdxes []SignatureWithIdx
+// convert types.SignedCommitment to beefy.SignedCommitment
+func ConvertCommitment(sc types.SignedCommitment) SignedCommitment {
+	var idxedSigs []Signature
 	for i, v := range sc.Signatures {
 		if v.IsSome() {
 			_, sig := v.Unwrap()
-			sigIdxes = append(sigIdxes, SignatureWithIdx{
-				Signature:      sig[:],
-				AuthorityIndex: uint32(i),
+			idxedSigs = append(idxedSigs, Signature{
+				Signature: sig[:],
+				Index:     uint32(i),
 			})
-			log.Printf("authority signatures: %+v", sigIdxes)
 
 		}
 	}
-	var csc = ConvertedSignedCommitment{
+	log.Printf("IndexedSignatures: %+v", idxedSigs)
+
+	// convert
+	// var payload []PayloadItem
+	// for _, v := range sc.Commitment.Payload {
+	// 	item := PayloadItem{
+	// 		Id:   v.ID,
+	// 		Data: v.Data,
+	// 	}
+	// 	payload = append(payload, item)
+	// }
+	// comment := Commitment{
+	// 	Payload:        payload,
+	// 	BlockNumber:    sc.Commitment.BlockNumber,
+	// 	ValidatorSetId: sc.Commitment.ValidatorSetID,
+	// }
+	var bsc = SignedCommitment{
 		Commitment: sc.Commitment,
-		Signatures: sigIdxes,
+		Signatures: idxedSigs,
 	}
-	log.Printf("converted commitment: %+v", csc)
-	return csc
+	log.Printf("converted commitment: %+v", bsc)
+	return bsc
 }
 
 // create authority proof
-func BuildAuthorityProofs(authorities [][]byte, authorityIdxes []uint64) (SizedByte32, [][]byte, error) {
+func BuildAuthorityProof(authorities [][]byte, authorityIdxes []uint64) (SizedByte32, [][]byte, error) {
 
 	var authorityLeaves [][]byte
 	for _, v := range authorities {
@@ -140,20 +165,27 @@ func BuildAuthorityProofs(authorities [][]byte, authorityIdxes []uint64) (SizedB
 	if err != nil {
 		return SizedByte32{}, nil, err
 	}
-	var authorityTreeRoot = Bytes32(authorityTree.Root())
+	// var authorityTreeRoot = Bytes32(authorityTree.Root())
+	authorityTreeRootRaw := authorityTree.Root()
+	log.Printf("build authority merkle root raw: %#x", authorityTreeRootRaw)
+	var authorityTreeRoot = Bytes32(authorityTreeRootRaw)
 
-	log.Printf("authorityTreeRoot: %+v", codec.HexEncodeToString(authorityTreeRoot[:]))
+	log.Printf("build authority merkle root bytes32: %#x", authorityTreeRoot[:])
 	authoritiesProof := authorityTree.Proof(authorityIdxes).ProofHashes()
 
-	log.Printf("authority proofs: %+v", authoritiesProof)
+	log.Printf("build authority proof: %+v", authoritiesProof)
 	return authorityTreeRoot, authoritiesProof, nil
 }
 
+func AuthoritiesThreshold(authoritySet types.BeefyNextAuthoritySet) uint32 {
+	return 2*uint32(authoritySet.Len)/3 + 1
+}
+
 // verify authority signatures
-func VerifyCommitmentSignatures(csc ConvertedSignedCommitment, totalLeavesCount uint64, merkleRoot SizedByte32, authorityProofs [][]byte) error {
+func VerifySignature(bsc SignedCommitment, totalLeavesCount uint64, merkleRoot SizedByte32, authorityProofs [][]byte) error {
 
 	// beefy authorities are signing the hash of the scale-encoded Commitment
-	commitmentBytes, err := codec.Encode(&csc.Commitment)
+	commitmentBytes, err := codec.Encode(bsc.Commitment)
 	if err != nil {
 		return err
 	}
@@ -164,8 +196,8 @@ func VerifyCommitmentSignatures(csc ConvertedSignedCommitment, totalLeavesCount 
 	// array of leaves in the authority merkle root.
 	var authorityLeaves []merkletypes.Leaf
 
-	for i := 0; i < len(csc.Signatures); i++ {
-		signature := csc.Signatures[i]
+	for i := 0; i < len(bsc.Signatures); i++ {
+		signature := bsc.Signatures[i]
 		// recover uncompressed public key from signature
 		pubkey, err := crypto.SigToPub(commitmentHash, signature.Signature)
 		if err != nil {
@@ -176,7 +208,7 @@ func VerifyCommitmentSignatures(csc ConvertedSignedCommitment, totalLeavesCount 
 		address := crypto.PubkeyToAddress(*pubkey)
 		authorityLeaf := merkletypes.Leaf{
 			Hash:  crypto.Keccak256(address[:]),
-			Index: uint64(signature.AuthorityIndex),
+			Index: uint64(signature.Index),
 		}
 		authorityLeaves = append(authorityLeaves, authorityLeaf)
 	}
@@ -187,7 +219,6 @@ func VerifyCommitmentSignatures(csc ConvertedSignedCommitment, totalLeavesCount 
 		return err
 	}
 	log.Printf("cal merkle root: %#x", calMerkleRoot)
-	// log.Printf("expected merkle root: %s\n", codec.HexEncodeToString(merkleRoot[:]))
 	log.Printf("expected merkle root: %#x", merkleRoot)
 
 	valid, err := authoritiesProof.Verify(merkleRoot[:])

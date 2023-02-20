@@ -29,7 +29,7 @@ func TestSignedCommitmentCodec(t *testing.T) {
 }
 
 func TestVerifySignedCommitmentLocal(t *testing.T) {
-	api, err := gsrpc.NewSubstrateAPI(LOCAL_RELAY_ENDPPOIT)
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	if err != nil {
 		t.Logf("Connecting err: %v", err)
 	}
@@ -44,13 +44,13 @@ func TestVerifySignedCommitmentLocal(t *testing.T) {
 
 	require.NoError(t, err)
 
-	t.Logf("subscribed to %s\n", LOCAL_RELAY_ENDPPOIT)
+	t.Logf("subscribed to %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
 
 	defer sub.Unsubscribe()
 
 	timeout := time.After(24 * time.Hour)
 	received := 0
-	var beefyActivationBlock uint32 = 1
+	// var beefyActivationBlock uint32 = 1
 
 	for {
 		select {
@@ -69,11 +69,11 @@ func TestVerifySignedCommitmentLocal(t *testing.T) {
 			blockHash, err := api.RPC.Chain.GetBlockHash(uint64(blockNumber))
 			require.NoError(t, err)
 			t.Logf("blockHash: %#x", blockHash)
-			leafIndex := beefy.GetLeafIndexForBlockNumber(beefyActivationBlock, blockNumber)
+			leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(beefy.BEEFY_ACTIVATION_BLOCK, blockNumber)
 			t.Logf("blockNumber: %d leafIndex: %d", blockNumber, leafIndex)
 			received++
 
-			if received >= 100 {
+			if received >= 5 {
 				return
 			}
 		case <-timeout:

@@ -5,30 +5,9 @@ import (
 	"testing"
 
 	"github.com/dablelv/go-huge-util/conv"
+	beefy "github.com/octopus-network/beefy-go/beefy"
 )
 
-// local testnet
-const LOCAL_RELAY_ENDPPOIT = "ws://127.0.0.1:9944"
-const LOCAL_PARACHAIN_ENDPOINT = "ws://127.0.0.1:9988"
-const LOCAL_PARACHAIN_ID uint32 = 2222
-
-// Rococo testnet
-const ROCOCO_ENDPOIN = "wss://rococo-rpc.polkadot.io"
-
-// Rockmine
-const ROCOCO_ROCKMIN_ID uint32 = 1000
-const ROCOCO_ROCKMIN_ENDPOINT = "wss://rococo-rockmine-rpc.polkadot.io"
-
-// Polkadot mainnet
-const POLKADOT_ENDPOINT = "wss://rpc.polkadot.io"
-
-// Astar
-const POLKADOT_ASTAR_ID uint32 = 2006
-const POLKADOT_ASTAR_ENDPOINT = "wss://rpc.astar.network"
-
-// Composable Finance
-const POLKADOT_COMPOSABLE_ID uint32 = 2019
-const POLKADOT_COMPOSABLE_ENDPOINT = "wss://rpc.composable.finance"
 
 func TestConvSlice(t *testing.T) {
 	value1 := "115 237 235 146 229 61 38 28 11 196 73 222 20 195 104 74 162 139 133 37 211 117 41 203 7 158 175 254 181 101 87 22 116 217 39 159 111 214 185 199 85 80 62 166 217 178 36 218 53 83 37 138 100 7 169 18 128 57 23 178 111 191 27 245 1"
@@ -40,5 +19,30 @@ func TestConvSlice(t *testing.T) {
 	t.Logf("replaced value: %v", replacedStr)
 	convValue2 := conv.SplitStrToSlice[byte](replacedStr, ",")
 	t.Logf("Split str to uint slice: %v", convValue2)
+
+}
+
+func TestLeafIndexAndBlockNumber(t *testing.T) {
+	// beefy activate block
+	var beefyActivationBlock uint32 = 0
+
+	// the first signed commitment blocknumber
+	var signedCommitmentBlockNumber uint32 = 1
+
+	for i := 0; i < 10; i++ {
+		leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(beefyActivationBlock, signedCommitmentBlockNumber)
+		t.Logf("beefyActivationBlock: %d, signedCommitmentBlockNumber: %d leafIndex: %d", beefyActivationBlock, signedCommitmentBlockNumber, leafIndex)
+		signedCommitmentBlockNumber = signedCommitmentBlockNumber + 8
+	}
+
+	// if beefyActivationBlock is not 0
+	beefyActivationBlock = 88
+	// the first signed commitment blocknumber
+	signedCommitmentBlockNumber = 89
+	for i := 0; i < 10; i++ {
+		leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(beefyActivationBlock, signedCommitmentBlockNumber)
+		t.Logf("beefyActivationBlock: %d, signedCommitmentBlockNumber: %d leafIndex: %d", beefyActivationBlock, signedCommitmentBlockNumber, leafIndex)
+		signedCommitmentBlockNumber = signedCommitmentBlockNumber + 8
+	}
 
 }
