@@ -17,7 +17,6 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/xxhash"
 	"github.com/ethereum/go-ethereum/crypto"
-	trie_scale "github.com/octopus-network/trie-go/scale"
 )
 
 // chain type
@@ -30,7 +29,8 @@ type SolochainHeader struct {
 	// scale-encoded parachain header bytes
 	BlockHeader []byte `protobuf:"bytes,1,opt,name=solochain_header,json=solochainHeader,proto3" json:"solochain_header,omitempty"`
 	// timestamp and proof
-	Timestamp Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp"`
+	// Timestamp Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp"`
+	Timestamp StateProof `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp"`
 }
 
 /// Parachain headers and their merkle proofs.
@@ -51,7 +51,8 @@ type ParachainHeader struct {
 	// total number of para heads in parachain_heads_root
 	HeaderCount uint32 `json:"head_count,omitempty"`
 	// timestamp and proof
-	Timestamp Timestamp `json:"timestamp,omitempty"`
+	// Timestamp Timestamp `json:"timestamp,omitempty"`
+	Timestamp StateProof `json:"timestamp,omitempty"`
 }
 
 type ParaIdAndHeader struct {
@@ -407,7 +408,7 @@ func BuildSolochainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64) 
 		}
 
 		//  get timestamp and proof
-		timestamp, err := BuildTimestamp(conn, solochainBlockHash)
+		timestamp, err := BuildTimestampProof(conn, solochainBlockHash)
 		if err != nil {
 			return nil, err
 		}
@@ -428,7 +429,7 @@ func BuildSolochainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64) 
 	return solochainHeaderMap, nil
 }
 
-//TODO: verify parachain header with proofs
+//verify solochain header with proofs
 func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32]SolochainHeader) (bool, error) {
 
 	//step1:verify solochain header
@@ -466,13 +467,14 @@ func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
 
 		//verify timestamp proof
-		timestampKey := CreateStorageKeyPrefix("Timestamp", "Now")
-		log.Printf("timestampKey: %#x", timestampKey)
-		value, err := trie_scale.Marshal(solochainHeader.Timestamp.Value)
-		if err != nil {
-			return false, err
-		}
-		ret, err = VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value)
+		// timestampKey := CreateStorageKeyPrefix("Timestamp", "Now")
+		// log.Printf("timestampKey: %#x", timestampKey)
+		// value, err := trie_scale.Marshal(solochainHeader.Timestamp.Value)
+		// if err != nil {
+		// 	return false, err
+		// }
+
+		ret, err = VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], solochainHeader.Timestamp.Key, solochainHeader.Timestamp.Value)
 		log.Printf("VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
 		if err != nil || !ret {
 			return false, err
@@ -484,7 +486,7 @@ func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32
 
 }
 
-//TODO: build parachain header map
+//build parachain header map
 func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, targetParachainId uint32) (map[uint32]ParachainHeader, error) {
 	leafNum := len(leafIndexes)
 	parachainHeaderMap := make(map[uint32]ParachainHeader)
@@ -579,19 +581,19 @@ func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, 
 		}
 		log.Printf("parachain blockHash: %#x ", blockHash)
 
-		timestamp, err := BuildTimestamp(parachainEndpoint, blockHash)
+		timestamp, err := BuildTimestampProof(parachainEndpoint, blockHash)
 		if err != nil {
 			return nil, err
 		}
 		log.Printf("timestamp: %+v", timestamp)
 
 		parachainHeader := ParachainHeader{
-			ParaId:      targetParachainId,
-			BlockHeader: targetParachainHeader,
-			Proof:       targetParachainHeaderProof,
-			HeaderIndex: targetHeaderIndex,
-			HeaderCount: parachainHeaderTotalCount,
-			Timestamp:   timestamp,
+			ParaId:         targetParachainId,
+			BlockHeader:    targetParachainHeader,
+			Proof:          targetParachainHeaderProof,
+			HeaderIndex:    targetHeaderIndex,
+			HeaderCount:    parachainHeaderTotalCount,
+			Timestamp: timestamp,
 		}
 		parachainHeaderMap[uint32(targetLeafIndex)] = parachainHeader
 	}
@@ -599,7 +601,7 @@ func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, 
 	return parachainHeaderMap, nil
 }
 
-//TODO: verify parachain header with proofs
+//verify parachain header with proofs
 func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32]ParachainHeader) (bool, error) {
 
 	//step1:verify parachain header
@@ -649,13 +651,13 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		log.Printf("parachain BlockNumber: %d", decodeParachainHeader.Number)
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
 
-		timestampKey := CreateStorageKeyPrefix("Timestamp", "Now")
-		log.Printf("timestampKey: %#x", timestampKey)
-		value, err := trie_scale.Marshal(parachainHeader.Timestamp.Value)
-		if err != nil {
-			return false, err
-		}
-		ret, err = VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value)
+		// timestampKey := CreateStorageKeyPrefix("Timestamp", "Now")
+		// log.Printf("timestampKey: %#x", timestampKey)
+		// value, err := trie_scale.Marshal(parachainHeader.TimestampProof.Value)
+		// if err != nil {
+		// 	return false, err
+		// }
+		ret, err = VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], parachainHeader.Timestamp.Key, parachainHeader.Timestamp.Value)
 		log.Printf("VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
 		if err != nil || !ret {
 			return false, err

@@ -93,7 +93,6 @@ func TestMMRCodec(t *testing.T) {
 	t.Logf("decodedProof2: %+v", decodedProof2)
 }
 
-//TODO: use static data to test
 func TestVerifyMMR(t *testing.T) {
 	encodeVersionedFinalityProof := "0x01046d68807a9e44f5ce2abbbb835d421aa30fbd208128ae6382094eb7b5c0e06c5bed30ae630f0000890100000000000004b8050000001012f5b0f14c5d821bb57e136a35eedc1e1a594a03729c3c67ff19a0c0c2c9696a0b27cbed5f5e2f1484a23b01a0787c4b04fa85a1003a2170f638e1167994030201d91d5fd8305c7d55860cf4e82e7ca81ed32ea106df06d4590a45a98ee01c14797d8267f6db5c9a884cdb10389d5602eb2a6d8283079c8fbd011c54903095e62b0019f246b1f8ee13bfa73a5c436925298bdf0c3fb284fdb8c7ae70031cfb1c15fc18651ef32ce6cd23eee63f513bb1222d99b7f45f7ce7989b18d3c1040d0a02b70166ca3a7a8eefab0df53b4ca0630de24715ab5aefe15f197b6f9c74e33792082c5e7d48be6da4689a5cacdba73be6157eab6294886da8b64725862d478449786900"
 	decodedVersionedFinalityProof := &beefy.VersionedFinalityProof{}
@@ -528,6 +527,7 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			// t.Logf("targetParaHeader: %+v", targetParaHeader)
 
 			// err = trie_proof.Verify(paraHeaderStateproofs, targetRelayerHeader.StateRoot[:], targetParaHeaderKey, paraHeaderValue)
+			//TODO: must be encoded again!?
 			marShalTargetParaHeader, err := trie_scale.Marshal(targetEncodedParaHeader)
 			require.NoError(t, err)
 			t.Logf("marShalTargetParaHeader: %#x", marShalTargetParaHeader)
@@ -561,10 +561,13 @@ func TestVerifyMMRLocal2(t *testing.T) {
 			t.Logf("paraTimestampStoragekey: %#x", paraTimestampStoragekey)
 			timestamp, err := beefy.GetTimestampValue(paraChainApi, paraChainBlockHash)
 			require.NoError(t, err)
-			// t.Logf("timestamp from parachain: ", timestamp)
-			t.Logf("timestamp from parachain: %d hex: %x", timestamp, timestamp)
-			time_str := time.UnixMilli(int64(timestamp))
-			t.Logf("timestamp from parachain: %s", time_str)
+			t.Logf("timestamp bytes: %+v", timestamp)
+			var decodeTimestamp types.U64
+			err = codec.Decode(timestamp, &decodeTimestamp)
+			require.NoError(t, err)
+			t.Logf("timestamp u64: %d", timestamp)
+			time_str := time.UnixMilli(int64(decodeTimestamp))
+			t.Logf("timestamp str: %s", time_str)
 
 			timestampProof, err := beefy.GetTimestampProof(paraChainApi, paraChainBlockHash)
 			require.NoError(t, err)
@@ -786,7 +789,7 @@ func TestVerifyMMRBatchProofLocal(t *testing.T) {
 			t.Log("------------------------------------------------------------------------------------")
 
 			//verify mmr batch proof
-			result, err := beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0], mmrSize,
+			result, err := beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload, mmrSize,
 				mmrBatchProof.Leaves, mmrBatchProof.Proof)
 			require.NoError(t, err)
 			t.Logf("beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0], mmrSize,mmrBatchProof.Leaves, mmrBatchProof.Proof) result: %+v", result)

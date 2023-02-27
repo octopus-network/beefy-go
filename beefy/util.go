@@ -41,6 +41,12 @@ func (b *SizedByte32) Size() int {
 	return len(b)
 }
 
+func Bytes32(bytes []byte) SizedByte32 {
+	var buffer SizedByte32
+	copy(buffer[:], bytes)
+	return buffer
+}
+
 type SizedByte2 [2]byte
 
 func (b *SizedByte2) Marshal() ([]byte, error) {
@@ -59,6 +65,12 @@ func (b *SizedByte2) Size() int {
 	return len(b)
 }
 
+func Bytes2(bytes []byte) SizedByte2 {
+	var buffer SizedByte2
+	copy(buffer[:], bytes)
+	return buffer
+}
+
 type U8 uint8
 
 func (u *U8) Marshal() ([]byte, error) {
@@ -75,12 +87,6 @@ func (u *U8) Unmarshal(data []byte) error {
 
 func (u *U8) Size() int {
 	return 1
-}
-
-func Bytes32(bytes []byte) SizedByte32 {
-	var buffer SizedByte32
-	copy(buffer[:], bytes)
-	return buffer
 }
 
 // beefy activation block height

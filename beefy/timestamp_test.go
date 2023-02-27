@@ -81,8 +81,6 @@ func TestVerifyTimestampProof(t *testing.T) {
 	time_str := time.UnixMilli(int64(timestamp))
 	// time_str := time.Unix(int64(timestamp), 0)
 	t.Logf("timestamp: %s\n", time_str)
-
-	// TODO add a concrete expected value once this test is fixed.
 	require.NotEmpty(t, value)
 }
 
@@ -140,7 +138,6 @@ func TestVerifyTimestampProof2(t *testing.T) {
 	// time_str := time.Unix(int64(timestamp), 0)
 	t.Logf("timestamp: %s\n", time_str)
 
-	// TODO add a concrete expected value once this test is fixed.
 	require.NotEmpty(t, value)
 }
 
@@ -219,9 +216,13 @@ func TestVerifyTimestampLocal(t *testing.T) {
 	t.Logf("paraTimestampStoragekey: %#x", paraTimestampStoragekey)
 	timestamp, err := beefy.GetTimestampValue(paraChainApi, paraChainBlockHash)
 	require.NoError(t, err)
-	t.Logf("timestamp: %d", timestamp)
-	time_str := time.UnixMilli(int64(timestamp))
-	t.Logf("timestamp: %s", time_str)
+	t.Logf("timestamp bytes: %+v", timestamp)
+	var decodeTimestamp types.U64
+	err = codec.Decode(timestamp, &decodeTimestamp)
+	require.NoError(t, err)
+	t.Logf("timestamp u64: %d", decodeTimestamp)
+	time_str := time.UnixMilli(int64(decodeTimestamp))
+	t.Logf("timestamp str: %s", time_str)
 
 	timestampProof, err := beefy.GetTimestampProof(paraChainApi, paraChainBlockHash)
 	require.NoError(t, err)
@@ -257,21 +258,22 @@ func TestVerifyTimestampLocal(t *testing.T) {
 	t.Logf("timestamp: %s\n", time_str2)
 
 	//verify timestamp proof
-	value2, err := trie_scale.Marshal(timestamp)
-	require.NoError(t, err)
-	result, err := beefy.VerifyStateProof(proofs, decodeParachainHeader.StateRoot[:], paraTimestampStoragekey, value2)
+	// value2, err := trie_scale.Marshal(timestamp)
+	// require.NoError(t, err)
+
+	result, err := beefy.VerifyStateProof(proofs, decodeParachainHeader.StateRoot[:], paraTimestampStoragekey, timestamp)
 	t.Log("beefy.VerifyStateProof(proof,root,key,value) result:", result)
 	require.NoError(t, err)
 	require.True(t, result)
 
 	t.Log("--- test: build and verify timestamp proof ---")
-	timestampWithProof, err := beefy.BuildTimestamp(paraChainApi, paraChainBlockHash)
+	timestampWithProof, err := beefy.BuildTimestampProof(paraChainApi, paraChainBlockHash)
 	require.NoError(t, err)
 	t.Logf("beefy.BuildTimestamp(paraChainApi, paraChainBlockHash): %+v", timestampWithProof)
-	value3, err := trie_scale.Marshal(timestampWithProof.Value)
+	// value3, err := trie_scale.Marshal(timestampWithProof.Value)
 	require.NoError(t, err)
-	ret, err := beefy.VerifyStateProof(timestampWithProof.Proofs, decodeParachainHeader.StateRoot[:], paraTimestampStoragekey, value3)
+	ret, err := beefy.VerifyStateProof(timestampWithProof.Proofs, decodeParachainHeader.StateRoot[:], timestampWithProof.Key, timestampWithProof.Value)
 	require.NoError(t, err)
-	t.Log("beefy.VerifyStateProof(timestampWithProof.Proofs,decodeParachainHeader.StateRoot[:],paraTimestampStoragekey,timestampWithProof.Value) result:", result)
+	t.Log("beefy.VerifyStateProof(timestampWithProof.Proofs, decodeParachainHeader.StateRoot[:], timestampWithProof.Key, timestampWithProof.Value) result:", result)
 	require.True(t, ret)
 }

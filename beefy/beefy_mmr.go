@@ -95,49 +95,52 @@ func BuildMMRBatchProof(conn *gsrpc.SubstrateAPI, blockHash *types.Hash, idxes [
 }
 
 // verify batch mmr proof
-func VerifyMMRBatchProof(payload types.PayloadItem, mmrSize uint64, mmrLeaves []types.MMRLeaf, mmrbatchProof MMRBatchProof) (bool, error) {
-	// TODO: check the parameters
+func VerifyMMRBatchProof(payloads []types.PayloadItem, mmrSize uint64, mmrLeaves []types.MMRLeaf, mmrbatchProof MMRBatchProof) (bool, error) {
+	for _, payload := range payloads {
+		mmrRootID := []byte("mh")
+		log.Printf("\nmmrRootID: %s\npayload.ID: %s", mmrRootID, payload.ID)
+		// checks for the right payloadId
+		if bytes.Equal(payload.ID[:], mmrRootID) {
+			leafNum := len(mmrLeaves)
+			var leaves = make([]merkletypes.Leaf, leafNum)
+			for i := 0; i < leafNum; i++ {
+				// scale encode the mmr leaf
+				encodedMMRLeaf, err := codec.Encode(mmrLeaves[i])
+				if err != nil {
+					return false, err
+				}
+				log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
+				leaf := merkletypes.Leaf{
+					Hash:  crypto.Keccak256(encodedMMRLeaf),
+					Index: uint64(mmrbatchProof.LeafIndex[i]),
+				}
+				leaves[i] = leaf
+			}
 
-	mmrRootID := []byte("mh")
-	log.Printf("\nmmrRootID: %s\npayload.ID: %s", mmrRootID, payload.ID)
-	// checks for the right payloadId
-	if bytes.Equal(payload.ID[:], mmrRootID) {
-		leafNum := len(mmrLeaves)
-		var leaves = make([]merkletypes.Leaf, leafNum)
-		for i := 0; i < leafNum; i++ {
-			// scale encode the mmr leaf
-			encodedMMRLeaf, err := codec.Encode(mmrLeaves[i])
+			var proofItmes = make([][]byte, len(mmrbatchProof.Items))
+			for i := 0; i < len(mmrbatchProof.Items); i++ {
+				proofItmes[i] = mmrbatchProof.Items[i][:]
+			}
+
+			mmrProof := mmr.NewProof(mmrSize, proofItmes, leaves, hasher.Keccak256Hasher{})
+			calMMRRoot, err := mmrProof.CalculateRoot()
+
 			if err != nil {
 				return false, err
 			}
-			log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
-			leaf := merkletypes.Leaf{
-				Hash:  crypto.Keccak256(encodedMMRLeaf),
-				Index: uint64(mmrbatchProof.LeafIndex[i]),
+
+			log.Printf("cal mmr root:%#x", calMMRRoot)
+			log.Printf("payload.Data:%#x", payload.Data)
+			ret := reflect.DeepEqual(calMMRRoot, payload.Data)
+			log.Printf("reflect.DeepEqual result :%#v", ret)
+			if !ret {
+				return false, nil
 			}
-			leaves[i] = leaf
+
 		}
-
-		var proofItmes = make([][]byte, len(mmrbatchProof.Items))
-		for i := 0; i < len(mmrbatchProof.Items); i++ {
-			proofItmes[i] = mmrbatchProof.Items[i][:]
-		}
-
-		mmrProof := mmr.NewProof(mmrSize, proofItmes, leaves, hasher.Keccak256Hasher{})
-		calMMRRoot, err := mmrProof.CalculateRoot()
-
-		if err != nil {
-			return false, err
-		}
-		log.Printf("cal mmr root:%#x", calMMRRoot)
-		log.Printf("payload.Data:%#x", payload.Data)
-		ret := reflect.DeepEqual(calMMRRoot, payload.Data)
-		log.Printf("reflect.DeepEqual result :%#v", ret)
-
-		return ret, nil
 	}
 
-	return false, nil
+	return true, nil
 
 }
 
@@ -161,8 +164,6 @@ func BuildMMRProof(conn *gsrpc.SubstrateAPI, leafIndex uint64, blockHash types.H
 
 // verify single mmr proof
 func VerifyMMRProof(commitment types.Commitment, mmrSize uint64, leafIndex uint64, mmrLeaf types.MMRLeaf, mmrLeafProof [][]byte) (bool, error) {
-	// TODO: check the parameters
-
 	for _, payload := range commitment.Payload {
 		mmrRootID := []byte("mh")
 		log.Printf("\nmmrRootID: %s\npayload.ID: %s", mmrRootID, payload.ID)

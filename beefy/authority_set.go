@@ -177,8 +177,8 @@ func BuildAuthorityProof(authorities [][]byte, authorityIdxes []uint64) (SizedBy
 	return authorityTreeRoot, authoritiesProof, nil
 }
 
-func AuthoritiesThreshold(authoritySet types.BeefyNextAuthoritySet) uint32 {
-	return 2*uint32(authoritySet.Len)/3 + 1
+func SignatureThreshold(authorityNum uint32) uint32 {
+	return 2*uint32(authorityNum)/3 + 1
 }
 
 // verify authority signatures

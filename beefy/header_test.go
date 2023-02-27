@@ -132,7 +132,7 @@ func TestGetParachainInfoLive(t *testing.T) {
 	}
 }
 
-func TestQueryParaChainStorageLocal(t *testing.T) {
+func TestQueryParachainStorageLocal(t *testing.T) {
 	relayApi, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)
 
@@ -908,7 +908,7 @@ func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
 
 			//verify mmr batch proof
 			t.Log("---  begin to verify mmr batch proof  ---")
-			result, err := beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0],
+			result, err := beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload,
 				mmrSize, mmrBatchProof.Leaves, mmrBatchProof.Proof)
 			require.NoError(t, err)
 			t.Logf("beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0], mmrSize,mmrBatchProof.Leaves, mmrBatchProof.Proof) result: %+v", result)
