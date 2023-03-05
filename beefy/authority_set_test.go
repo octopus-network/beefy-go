@@ -82,6 +82,8 @@ func TestVerifyValidatorProofLocal(t *testing.T) {
 			}
 
 			t.Logf("decoded msg: %+v", s)
+			t.Logf("decoded msg: %#v", s)
+			t.Logf("decoded msg: %v", s)
 			blockNumber := s.SignedCommitment.Commitment.BlockNumber
 			t.Logf("blockNumber: %d", blockNumber)
 			blockHash, err := api.RPC.Chain.GetBlockHash(uint64(blockNumber))
@@ -111,7 +113,7 @@ func TestVerifyValidatorProofLocal(t *testing.T) {
 
 			received++
 
-			if received >= 2 {
+			if received >= 3 {
 				return
 			}
 		case <-timeout:

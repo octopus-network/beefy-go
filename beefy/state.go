@@ -150,8 +150,8 @@ func GetTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (ReadProo
 }
 
 // verify state proof
-// the value must be scale encoded 
-func VerifyStateProof(stateProof [][]byte, stateRoot []byte, key []byte, value []byte) (bool, error) {
+// the value must be scale encoded
+func VerifyStateProof(stateProof [][]byte, stateRoot []byte, key []byte, value []byte) error {
 	//TODO: need marshal?
 	// encodedValue, err := trie_scale.Marshal(value)
 	// if err != nil {
@@ -161,8 +161,8 @@ func VerifyStateProof(stateProof [][]byte, stateRoot []byte, key []byte, value [
 	err := trie_proof.Verify(stateProof, stateRoot, key, value)
 
 	if err != nil {
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 
 }

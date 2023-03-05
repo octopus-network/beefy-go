@@ -2,6 +2,7 @@ package beefy
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -21,8 +22,8 @@ import (
 
 // chain type
 const (
-	SOLOCHAIN uint32 = 0
-	PARACHAIN uint32 = 1
+	CHAINTYPE_SOLOCHAIN uint32 = 0
+	CHAINTYPE_PARACHAIN uint32 = 1
 )
 
 type SolochainHeader struct {
@@ -231,7 +232,7 @@ func BuildParachainHeaderProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash,
 	proofCount := len(mmrBatchProof.Leaves)
 	for i := 0; i < proofCount; i++ {
 
-		relayerLeafWithIdx := MMRLeafWithIndex{Leaf: mmrBatchProof.Leaves[i], Index: uint64(mmrBatchProof.Proof.LeafIndex[i])}
+		relayerLeafWithIdx := MMRLeafWithIndex{Leaf: mmrBatchProof.Leaves[i], Index: uint64(mmrBatchProof.Proof.LeafIndexes[i])}
 		log.Printf("idxedLeaf: %+v", relayerLeafWithIdx)
 		var leafBlockNumber = ConvertMmrLeafIndexToBlockNumber(BEEFY_ACTIVATION_BLOCK, uint32(relayerLeafWithIdx.Index))
 		// var leafBlockNumber = uint32(relayerLeafWithIdx.Index)
@@ -430,7 +431,7 @@ func BuildSolochainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64) 
 }
 
 //verify solochain header with proofs
-func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32]SolochainHeader) (bool, error) {
+func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32]SolochainHeader) error {
 
 	//step1:verify solochain header
 	//the leaf parent hash == blake2b256(scale.encode(solochain header))
@@ -439,12 +440,12 @@ func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32
 		solochainHeader := solochainHeaderMap[uint32(leaf.ParentNumberAndHash.ParentNumber)]
 		blake2b256, err := hash.NewBlake2b256(nil)
 		if err != nil {
-			return false, err
+			return err
 		}
 		_, err = blake2b256.Write(solochainHeader.BlockHeader)
 		headHash := blake2b256.Sum(nil)
 		if err != nil {
-			return false, err
+			return err
 		}
 		log.Printf("leaf.ParentNumberAndHash.ParentNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
 		log.Printf("mmrLeaf parent Hash: %#x", leaf.ParentNumberAndHash.Hash)
@@ -453,7 +454,7 @@ func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32
 
 		if !ret {
 
-			return false, nil
+			return errors.New("failure to verify solochain header")
 		}
 
 		//step2:verify timestamp and proof
@@ -461,7 +462,7 @@ func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32
 		var decodeParachainHeader types.Header
 		err = codec.Decode(solochainHeader.BlockHeader, &decodeParachainHeader)
 		if err != nil {
-			return false, err
+			return err
 		}
 		log.Printf("solochain BlockNumber: %d", decodeParachainHeader.Number)
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
@@ -473,16 +474,16 @@ func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32
 		// if err != nil {
 		// 	return false, err
 		// }
-
-		ret, err = VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], solochainHeader.Timestamp.Key, solochainHeader.Timestamp.Value)
+		log.Printf("-------------- verify timestamp proof ---------------")
+		err = VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], solochainHeader.Timestamp.Key, solochainHeader.Timestamp.Value)
 		log.Printf("VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
-		if err != nil || !ret {
-			return false, err
+		if err != nil {
+			return err
 		}
 
 	}
 
-	return true, nil
+	return nil
 
 }
 
@@ -570,7 +571,7 @@ func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, 
 		log.Printf("parachain BlockNumber: %d", decodeParachainHeader.Number)
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
 
-		// swich to parachain endpoint
+		// switch to parachain endpoint
 		parachainEndpoint, err := gsrpc.NewSubstrateAPI(LOCAL_PARACHAIN_ENDPOINT)
 		if err != nil {
 			return nil, err
@@ -588,12 +589,12 @@ func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, 
 		log.Printf("timestamp: %+v", timestamp)
 
 		parachainHeader := ParachainHeader{
-			ParaId:         targetParachainId,
-			BlockHeader:    targetParachainHeader,
-			Proof:          targetParachainHeaderProof,
-			HeaderIndex:    targetHeaderIndex,
-			HeaderCount:    parachainHeaderTotalCount,
-			Timestamp: timestamp,
+			ParaId:      targetParachainId,
+			BlockHeader: targetParachainHeader,
+			Proof:       targetParachainHeaderProof,
+			HeaderIndex: targetHeaderIndex,
+			HeaderCount: parachainHeaderTotalCount,
+			Timestamp:   timestamp,
 		}
 		parachainHeaderMap[uint32(targetLeafIndex)] = parachainHeader
 	}
@@ -602,14 +603,14 @@ func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, 
 }
 
 //verify parachain header with proofs
-func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32]ParachainHeader) (bool, error) {
+func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32]ParachainHeader) error {
 
 	//step1:verify parachain header
 	for _, leaf := range leaves {
 		parachainHeader := ParachainHeaderMap[uint32(leaf.ParentNumberAndHash.ParentNumber)]
 		encodedParachainHeader, err := codec.Encode(ParaIdAndHeader{ParaId: parachainHeader.ParaId, Header: parachainHeader.BlockHeader})
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		targetParaHeaderLeaves := []merkletypes.Leaf{
@@ -625,7 +626,7 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		// get merkle root
 		parachainHeadsRoot, err := parachainHeadsProof.Root()
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		// verify new merkle root == mmrLeafParachainHeads
@@ -638,7 +639,7 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		ret := reflect.DeepEqual(parachainHeadsRoot, leaf.ParachainHeads[:])
 		if !ret {
 
-			return false, nil
+			return errors.New("failure to verify parachain header")
 		}
 
 		//verify timestamp proof
@@ -646,7 +647,7 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		var decodeParachainHeader types.Header
 		err = codec.Decode(parachainHeader.BlockHeader, &decodeParachainHeader)
 		if err != nil {
-			return false, err
+			return err
 		}
 		log.Printf("parachain BlockNumber: %d", decodeParachainHeader.Number)
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
@@ -657,14 +658,14 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		// if err != nil {
 		// 	return false, err
 		// }
-		ret, err = VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], parachainHeader.Timestamp.Key, parachainHeader.Timestamp.Value)
+		err = VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], parachainHeader.Timestamp.Key, parachainHeader.Timestamp.Value)
 		log.Printf("VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
-		if err != nil || !ret {
-			return false, err
+		if err != nil {
+			return err
 		}
 
 	}
 
-	return true, nil
+	return nil
 
 }

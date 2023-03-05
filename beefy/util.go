@@ -3,6 +3,7 @@ package beefy
 // local testnet
 const LOCAL_RELAY_ENDPPOIT = "ws://127.0.0.1:9944"
 const LOCAL_PARACHAIN_ENDPOINT = "ws://127.0.0.1:9988"
+const LOCAL_SOLOCHAIN_ID uint32 = 0
 const LOCAL_PARACHAIN_ID uint32 = 2222
 
 // Rococo testnet

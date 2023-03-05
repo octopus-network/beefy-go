@@ -181,10 +181,10 @@ func TestVerifyTimestampProof3(t *testing.T) {
 	var timestamp uint64 = 1675758630035
 	value, err := trie_scale.Marshal(timestamp)
 	require.NoError(t, err)
-	result, err := beefy.VerifyStateProof(proof, root, key, value)
-	t.Log("beefy.VerifyStateProof(proof,root,key,value) result:", result)
+	err = beefy.VerifyStateProof(proof, root, key, value)
 	require.NoError(t, err)
-	require.True(t, result)
+	t.Log("beefy.VerifyStateProof(proof,root,key,value) result: True")
+	// require.True(t, result)
 
 }
 
@@ -261,10 +261,10 @@ func TestVerifyTimestampLocal(t *testing.T) {
 	// value2, err := trie_scale.Marshal(timestamp)
 	// require.NoError(t, err)
 
-	result, err := beefy.VerifyStateProof(proofs, decodeParachainHeader.StateRoot[:], paraTimestampStoragekey, timestamp)
-	t.Log("beefy.VerifyStateProof(proof,root,key,value) result:", result)
+	err = beefy.VerifyStateProof(proofs, decodeParachainHeader.StateRoot[:], paraTimestampStoragekey, timestamp)
 	require.NoError(t, err)
-	require.True(t, result)
+	t.Log("beefy.VerifyStateProof(proof,root,key,value) result: True")
+	// require.True(t, result)
 
 	t.Log("--- test: build and verify timestamp proof ---")
 	timestampWithProof, err := beefy.BuildTimestampProof(paraChainApi, paraChainBlockHash)
@@ -272,8 +272,8 @@ func TestVerifyTimestampLocal(t *testing.T) {
 	t.Logf("beefy.BuildTimestamp(paraChainApi, paraChainBlockHash): %+v", timestampWithProof)
 	// value3, err := trie_scale.Marshal(timestampWithProof.Value)
 	require.NoError(t, err)
-	ret, err := beefy.VerifyStateProof(timestampWithProof.Proofs, decodeParachainHeader.StateRoot[:], timestampWithProof.Key, timestampWithProof.Value)
+	err = beefy.VerifyStateProof(timestampWithProof.Proofs, decodeParachainHeader.StateRoot[:], timestampWithProof.Key, timestampWithProof.Value)
 	require.NoError(t, err)
-	t.Log("beefy.VerifyStateProof(timestampWithProof.Proofs, decodeParachainHeader.StateRoot[:], timestampWithProof.Key, timestampWithProof.Value) result:", result)
-	require.True(t, ret)
+	t.Log("beefy.VerifyStateProof(timestampWithProof.Proofs, decodeParachainHeader.StateRoot[:], timestampWithProof.Key, timestampWithProof.Value) result: True")
+	// require.True(t, ret)
 }

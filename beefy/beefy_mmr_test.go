@@ -752,7 +752,7 @@ func TestVerifyMMRBatchProofLocal(t *testing.T) {
 				t.Logf("mmrBatchProof leaf: %+v", leaf)
 			}
 			t.Logf("targetRelayChainBlockHeights: %+v", targetRelayChainBlockHeights)
-			t.Logf("The indexes of the leaf the proof is for: %+v", mmrBatchProof.Proof.LeafIndex)
+			t.Logf("The indexes of the leaf the proof is for: %+v", mmrBatchProof.Proof.LeafIndexes)
 			t.Logf("Number of leaves in MMR, when the proof was generated: %d", mmrBatchProof.Proof.LeafCount)
 			// leafCount := mmrBatchProof.Proof.LeafCount
 			// mmrSize := mmr.LeafIndexToMMRSize(uint64(leafCount))
@@ -774,7 +774,7 @@ func TestVerifyMMRBatchProofLocal(t *testing.T) {
 				log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
 				mmrLeaf := merkletypes.Leaf{
 					Hash:  crypto.Keccak256(encodedMMRLeaf),
-					Index: uint64(mmrBatchProof.Proof.LeafIndex[i]),
+					Index: uint64(mmrBatchProof.Proof.LeafIndexes[i]),
 				}
 				mmrLeaves[i] = mmrLeaf
 			}
@@ -801,7 +801,7 @@ func TestVerifyMMRBatchProofLocal(t *testing.T) {
 
 			received++
 
-			if received >= 2 {
+			if received >= 3 {
 				return
 			}
 		case <-timeout:

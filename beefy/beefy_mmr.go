@@ -3,6 +3,7 @@ package beefy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
 	"reflect"
 
@@ -32,7 +33,7 @@ type MMRLeavesAndBatchProof struct {
 // MmrProof is a MMR proof
 type MMRBatchProof struct {
 	// The index of the leaf the proof is for.
-	LeafIndex []types.U64
+	LeafIndexes []types.U64
 	// Number of leaves in MMR, when the proof was generated.
 	LeafCount types.U64
 	// Proof elements (hashes of siblings of inner nodes on the path to the leaf).
@@ -112,7 +113,7 @@ func VerifyMMRBatchProof(payloads []types.PayloadItem, mmrSize uint64, mmrLeaves
 				log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
 				leaf := merkletypes.Leaf{
 					Hash:  crypto.Keccak256(encodedMMRLeaf),
-					Index: uint64(mmrbatchProof.LeafIndex[i]),
+					Index: uint64(mmrbatchProof.LeafIndexes[i]),
 				}
 				leaves[i] = leaf
 			}
@@ -134,7 +135,7 @@ func VerifyMMRBatchProof(payloads []types.PayloadItem, mmrSize uint64, mmrLeaves
 			ret := reflect.DeepEqual(calMMRRoot, payload.Data)
 			log.Printf("reflect.DeepEqual result :%#v", ret)
 			if !ret {
-				return false, nil
+				return false, errors.New("failure to verfify mmr")
 			}
 
 		}
