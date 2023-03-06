@@ -488,18 +488,19 @@ func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32
 }
 
 //build parachain header map
-func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, targetParachainId uint32) (map[uint32]ParachainHeader, error) {
+func BuildParachainHeaderMap(relaychainEndpoint *gsrpc.SubstrateAPI, parachainEndpoint *gsrpc.SubstrateAPI,
+	leafIndexes []types.U64, targetParachainId uint32) (map[uint32]ParachainHeader, error) {
 	leafNum := len(leafIndexes)
 	parachainHeaderMap := make(map[uint32]ParachainHeader)
 
 	for i := 0; i < leafNum; i++ {
 		targetLeafIndex := uint64(leafIndexes[i])
-		targetLeafBlockHash, err := conn.RPC.Chain.GetBlockHash(targetLeafIndex)
+		targetLeafBlockHash, err := relaychainEndpoint.RPC.Chain.GetBlockHash(targetLeafIndex)
 		if err != nil {
 			return nil, err
 		}
 		log.Printf("targetLeafIndex: %d targetLeafBlockHash: %#x", targetLeafIndex, targetLeafBlockHash)
-		paraChainIds, err := GetParachainIds(conn, targetLeafBlockHash)
+		paraChainIds, err := GetParachainIds(relaychainEndpoint, targetLeafBlockHash)
 		if err != nil {
 			return nil, err
 		}
@@ -507,7 +508,7 @@ func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, 
 		var encodedheaderMap = make(map[uint32][]byte, len(paraChainIds))
 		//find relayer header that includes all the target parachain header
 		for _, parachainId := range paraChainIds {
-			encodedHeader, err := GetParachainHeader(conn, uint32(parachainId), targetLeafBlockHash)
+			encodedHeader, err := GetParachainHeader(relaychainEndpoint, uint32(parachainId), targetLeafBlockHash)
 			if err != nil {
 				return nil, err
 			}
@@ -572,7 +573,7 @@ func BuildParachainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, 
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
 
 		// switch to parachain endpoint
-		parachainEndpoint, err := gsrpc.NewSubstrateAPI(LOCAL_PARACHAIN_ENDPOINT)
+		// parachainEndpoint, err := gsrpc.NewSubstrateAPI(LOCAL_PARACHAIN_ENDPOINT)
 		if err != nil {
 			return nil, err
 		}
@@ -622,7 +623,7 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		parachainHeadsProof := merkle.NewProof(targetParaHeaderLeaves, parachainHeader.Proof,
 			uint64(parachainHeader.HeaderCount), hasher.Keccak256Hasher{})
 
-		// todo: merkle.Proof.Root() should return fixed bytes
+		// TODO: constraint condition: merkle.Proof.Root() should return fixed bytes
 		// get merkle root
 		parachainHeadsRoot, err := parachainHeadsProof.Root()
 		if err != nil {
