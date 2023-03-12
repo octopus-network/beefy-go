@@ -224,7 +224,7 @@ func BuildRelaychainHeaderMap(conn *gsrpc.SubstrateAPI, blockHash types.Hash, ch
 // }
 
 func BuildParachainHeaderProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash,
-	mmrBatchProof GenerateMmrBatchProofResponse,
+	mmrBatchProof MmrProofsResp,
 	relayerHeaderMap map[uint32]map[uint32][]byte,
 	targetParaId uint32) ([]ParachainHeader, error) {
 
@@ -311,7 +311,7 @@ func BuildParachainHeaderProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash,
 // 	ParachainHeads SizedByte32 `protobuf:"bytes,5,opt,name=parachain_heads,json=parachainHeads,proto3,customtype=SizedByte32" json:"parachain_heads,omitempty"`
 // }
 
-func BuildMMRProofFromParaHeaders(paraHeaderWithProofs []ParachainHeader, mmrSize uint64, mmrBatchProof GenerateMmrBatchProofResponse) (*mmr.Proof, error) {
+func BuildMMRProofFromParaHeaders(paraHeaderWithProofs []ParachainHeader, mmrSize uint64, mmrBatchProof MmrProofsResp) (*mmr.Proof, error) {
 
 	paraHeadProofsLen := len(paraHeaderWithProofs)
 	log.Printf("proofsLen: %d", paraHeadProofsLen)

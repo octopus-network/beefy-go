@@ -54,25 +54,6 @@ func (vfp VersionedFinalityProof) Encode(encoder scale.Encoder) error {
 	return nil
 }
 
-// type SignatureWithIdx struct {
-// 	// actual signature bytes
-// 	Signature []byte
-// 	// authority leaf index in the merkle tree.
-// 	AuthorityIndex uint32
-// }
-// Signature with it`s index in merkle tree
-// type IndexedSignature struct {
-// 	// signature leaf index in the merkle tree.
-// 	Index uint32 `json:"index,omitempty"`
-// 	// signature bytes
-// 	Signature []byte `json:"signature,omitempty"`
-// }
-
-// type ConvertedSignedCommitment struct {
-// 	Commitment types.Commitment
-// 	Signatures []IndexedSignature
-// }
-
 // signed commitment data
 type SignedCommitment struct {
 	// commitment data being signed
@@ -81,19 +62,3 @@ type SignedCommitment struct {
 	Signatures []Signature `json:"indexed_signatures,omitempty"`
 }
 
-// // Actual payload items
-// type PayloadItem struct {
-// 	// 2-byte payload id
-// 	Id [2]byte `json:"payload_id,omitempty"`
-// 	// arbitrary length payload data., eg mmr_root_hash
-// 	Data []byte `json:"payload_data,omitempty"`
-// }
-
-// type Commitment struct {
-// 	// array of payload items signed by Beefy validators
-// 	Payload []PayloadItem `json:"payload,omitempty"`
-// 	// block number for this commitment
-// 	BlockNumber uint32 `json:"block_number,omitempty"`
-// 	// validator set that signed this commitment
-// 	ValidatorSetId uint64 `json:"validator_set_id,omitempty"`
-// }

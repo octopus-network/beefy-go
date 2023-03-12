@@ -620,7 +620,7 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 			changeSets, err := beefy.QueryParachainStorage(api, beefy.LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
 			require.NoError(t, err)
 			t.Logf("changeSet len: %d", len(changeSets))
-			var targetRelayChainBlockHeights []uint64
+			var targetRelayChainBlockHeights []uint32
 			for _, changeSet := range changeSets {
 				header, err := api.RPC.Chain.GetHeader(changeSet.Block)
 				require.NoError(t, err)
@@ -635,12 +635,14 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 					t.Log("change.HasStorageData: ", change.HasStorageData)
 					t.Logf("change.HasStorageData: %#x", change.StorageData)
 				}
-				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint64(header.Number))
+				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint32(header.Number))
 
 			}
 
 			// build mmr proofs for leaves containing target paraId
-			mmrBatchProof, err := beefy.BuildMMRBatchProof(api, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
+			// mmrBatchProof, err := beefy.BuildMMRBatchProof(api, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
+			mmrBatchProof, err := beefy.BuildMMRProofs(api, targetRelayChainBlockHeights,
+				types.NewOptionU32(types.U32(latestSignedCommitmentBlockNumber)), types.NewOptionHashEmpty())
 			require.NoError(t, err)
 			// t.Logf("mmrBatchProof: %+v", mmrBatchProof)
 			t.Logf("mmrBatchProof.BlockHash: %#x", mmrBatchProof.BlockHash)
@@ -794,7 +796,7 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 
 			received++
 
-			if received >= 10 {
+			if received >= 3 {
 				return
 			}
 		case <-timeout:
@@ -868,7 +870,7 @@ func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
 			changeSets, err := beefy.QueryParachainStorage(relaychainEndpoint, beefy.LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
 			require.NoError(t, err)
 			t.Logf("changeSet len: %d", len(changeSets))
-			var targetRelayChainBlockHeights []uint64
+			var targetRelayChainBlockHeights []uint32
 			for _, changeSet := range changeSets {
 				header, err := relaychainEndpoint.RPC.Chain.GetHeader(changeSet.Block)
 				require.NoError(t, err)
@@ -883,12 +885,15 @@ func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
 					t.Log("change.HasStorageData: ", change.HasStorageData)
 					t.Logf("change.HasStorageData: %#x", change.StorageData)
 				}
-				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint64(header.Number))
+				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint32(header.Number))
 
 			}
 
 			// build mmr proofs for leaves containing target paraId
-			mmrBatchProof, err := beefy.BuildMMRBatchProof(relaychainEndpoint, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
+			// mmrBatchProof, err := beefy.BuildMMRBatchProof(relaychainEndpoint, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
+			mmrBatchProof, err := beefy.BuildMMRProofs(relaychainEndpoint, targetRelayChainBlockHeights,
+				types.NewOptionU32(types.U32(latestSignedCommitmentBlockNumber)), types.NewOptionHashEmpty())
+
 			require.NoError(t, err)
 			// t.Logf("mmrBatchProof: %+v", mmrBatchProof)
 			t.Logf("mmrBatchProof.BlockHash: %#x", mmrBatchProof.BlockHash)

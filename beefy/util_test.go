@@ -4,10 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
 	"github.com/dablelv/go-huge-util/conv"
 	beefy "github.com/octopus-network/beefy-go/beefy"
+	"github.com/stretchr/testify/require"
 )
-
 
 func TestConvSlice(t *testing.T) {
 	value1 := "115 237 235 146 229 61 38 28 11 196 73 222 20 195 104 74 162 139 133 37 211 117 41 203 7 158 175 254 181 101 87 22 116 217 39 159 111 214 185 199 85 80 62 166 217 178 36 218 53 83 37 138 100 7 169 18 128 57 23 178 111 191 27 245 1"
@@ -44,5 +45,41 @@ func TestLeafIndexAndBlockNumber(t *testing.T) {
 		t.Logf("beefyActivationBlock: %d, signedCommitmentBlockNumber: %d leafIndex: %d", beefyActivationBlock, signedCommitmentBlockNumber, leafIndex)
 		signedCommitmentBlockNumber = signedCommitmentBlockNumber + 8
 	}
+
+}
+
+func TestChainInfo(t *testing.T) {
+	// The following example shows how to instantiate a Substrate API and use it to connect to a node
+	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
+	require.NoError(t, err)
+
+	chain, err := api.RPC.System.Chain()
+	require.NoError(t, err)
+	t.Log("chain:", chain)
+
+	nodeName, err := api.RPC.System.Name()
+	require.NoError(t, err)
+	t.Log("nodeName:", nodeName)
+
+	nodeVersion, err := api.RPC.System.Version()
+	require.NoError(t, err)
+	t.Log("nodeVersion:", nodeVersion)
+	t.Logf("You are connected to chain %v using %v v%v\n", chain, nodeName, nodeVersion)
+
+	rpcMethods, err := beefy.RpcMethods(api)
+	require.NoError(t, err)
+	methods := rpcMethods.Methods
+	t.Logf("rpc methods:")
+	for _, m := range methods {
+		t.Logf("%s", m)
+	}
+	beefyFinalizedHeadHash, err := beefy.GetBeefyFinalizedHead(api)
+	require.NoError(t, err)
+
+	beefyFinalizedHeader, err := api.RPC.Chain.GetHeader(beefyFinalizedHeadHash)
+	require.NoError(t, err)
+	t.Logf("beefy finalized head hash: %#x", beefyFinalizedHeadHash)
+	t.Logf("beefy finalized head nubmer: %d", beefyFinalizedHeader.Number)
+	// t.Logf("beefy finalized header: %+v", beefyFinalizedHeader)
 
 }

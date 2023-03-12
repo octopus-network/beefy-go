@@ -1,5 +1,10 @@
 package beefy
 
+import (
+	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+)
+
 // local testnet
 const LOCAL_RELAY_ENDPPOIT = "ws://127.0.0.1:9944"
 const LOCAL_PARACHAIN_ENDPOINT = "ws://127.0.0.1:9988"
@@ -124,4 +129,28 @@ func ConvertBlockNumberToMmrLeafIndex(beefyActivationBlock uint32, blockNumber u
 	}
 
 	return uint64(leafIndex)
+}
+
+type RPCMethods struct {
+	Methods []string `json:"methods"`
+}
+
+func RpcMethods(conn *gsrpc.SubstrateAPI) (RPCMethods, error) {
+
+	var rpcMethods RPCMethods
+	err := conn.Client.Call(&rpcMethods, "rpc_methods")
+	return rpcMethods, err
+
+}
+
+func GetBeefyFinalizedHead(conn *gsrpc.SubstrateAPI) (types.Hash, error) {
+
+	var hash types.Hash
+	err := conn.Client.Call(&hash, "beefy_getFinalizedHead")
+	if err != nil {
+		return types.Hash{}, err
+	}
+
+	return hash, err
+
 }

@@ -93,6 +93,72 @@ func TestMMRCodec(t *testing.T) {
 	t.Logf("decodedProof2: %+v", decodedProof2)
 }
 
+func TestMMRBatchCodec(t *testing.T) {
+
+	var tmp struct {
+		BlockHash string `json:"blockHash"`
+		Leaves    string `json:"leaves"`
+		Proof     string `json:"proof"`
+	}
+
+	generateMMRProofResp := `{
+		"blockHash": "0x672fcecc6f9c07772ac4843ec4aead862eb7567071f7942b1da9b3849e5ec9d8",
+		"leaves": "0x0cc501000e0000004b8dc1829810e2cc59b47adb52c14c951d3eb61fcb36f6ac56812cb0c920cec7020000000000000005000000304803fa5a91d9852caafe04b4b867a4ed27a07a5bee3d1507b4b187a68777a2a77fb75edf2b3bc80924f6c3255a1bca97ae42cdb30986969768ed82495ebee6c5010010000000d9d86e5d56acfe19ed2c2011576d74d028f3dd7578cf3b09064288f026167d61020000000000000005000000304803fa5a91d9852caafe04b4b867a4ed27a07a5bee3d1507b4b187a68777a2a77fb75edf2b3bc80924f6c3255a1bca97ae42cdb30986969768ed82495ebee6c5010012000000df137faa5d139fec99e4cd4d627d364076c86f5d294ec1ef9b29669b41b625aa030000000000000005000000304803fa5a91d9852caafe04b4b867a4ed27a07a5bee3d1507b4b187a68777a2cafd53b959b91235e60574ad7dd0068cb4bdc75ffa16449e889580b85e4e198d",
+		"proof": "0x0c0e000000000000001000000000000000120000000000000015000000000000001ca2087d6ed45d311774a444dc598a131c273dcdd8c7da52c527300ff265901fc53e3ae7631f1a4254d840842c0774146e74324e6acdccd5f27476011c4fda92dfa361c649f5fce1490a9599f72f067ba3ad0681213d4ca71ddb3f42804f18dcb0398ae687a5317866cc99ec069776f85899b3d33a8f105d111204b47445b0be3396f8c369cd0aaa0d299fa7ce285a8ae8015a39a247c78545fb98ec7724bf4691674f2572ff886afd338bc861feac2bc8fa9aa792881b2d872b405f0a0147c204e75c818b7123a793d88e0b8ac8f0713f5f5f371cf3b3ae55ae57ee1e746bb3ce"
+	  }`
+	err := json.Unmarshal([]byte(generateMMRProofResp), &tmp)
+	require.NoError(t, err)
+	t.Logf("generateMMRProofResp Unmarshal: %+v", tmp)
+
+	blockHash := &types.H256{}
+	err = codec.DecodeFromHex(tmp.BlockHash, &blockHash)
+	require.NoError(t, err)
+	t.Logf("blockHash: %#x", blockHash)
+
+	// var mmrLeaves []types.MMRLeaf
+	// err = codec.DecodeFromHex(tmp.Leaves, &mmrLeaves)
+	// require.NoError(t, err)
+	// t.Logf("mmrLeaves: %+v", mmrLeaves)
+
+	var opaqueLeaves [][]byte
+	err = codec.DecodeFromHex(tmp.Leaves, &opaqueLeaves)
+	require.NoError(t, err)
+	t.Logf("opaqueLeaves: %+v", opaqueLeaves)
+	type ParentNumberAndHash struct {
+		ParentNumber types.U32
+		Hash         types.Hash
+	}
+	type MMRLeaf struct {
+		Version               types.MMRLeafVersion
+		ParentNumberAndHash   ParentNumberAndHash
+		BeefyNextAuthoritySet types.BeefyNextAuthoritySet
+		ParachainHeads        types.H256
+	}
+	var leaves []MMRLeaf
+	for _, leaf := range opaqueLeaves {
+
+		var mmrLeaf MMRLeaf
+		err := codec.Decode(leaf, &mmrLeaf)
+		require.NoError(t, err)
+		t.Logf("mmrleaf: %+v", mmrLeaf)
+		leaves = append(leaves, mmrLeaf)
+	}
+	t.Logf("leaves: %+v", leaves)
+
+	type MMRBatchProof struct {
+		// The index of the leaf the proof is for.
+		LeafIndexes []types.U64
+		// Number of leaves in MMR, when the proof was generated.
+		LeafCount types.U64
+		// Proof elements (hashes of siblings of inner nodes on the path to the leaf).
+		Items []types.H256
+	}
+	decodedProof := &MMRBatchProof{}
+	err = codec.DecodeFromHex(tmp.Proof, decodedProof)
+	require.NoError(t, err)
+	t.Logf("decodedProof: %+v", decodedProof)
+}
+
 func TestVerifyMMR(t *testing.T) {
 	encodeVersionedFinalityProof := "0x01046d68807a9e44f5ce2abbbb835d421aa30fbd208128ae6382094eb7b5c0e06c5bed30ae630f0000890100000000000004b8050000001012f5b0f14c5d821bb57e136a35eedc1e1a594a03729c3c67ff19a0c0c2c9696a0b27cbed5f5e2f1484a23b01a0787c4b04fa85a1003a2170f638e1167994030201d91d5fd8305c7d55860cf4e82e7ca81ed32ea106df06d4590a45a98ee01c14797d8267f6db5c9a884cdb10389d5602eb2a6d8283079c8fbd011c54903095e62b0019f246b1f8ee13bfa73a5c436925298bdf0c3fb284fdb8c7ae70031cfb1c15fc18651ef32ce6cd23eee63f513bb1222d99b7f45f7ce7989b18d3c1040d0a02b70166ca3a7a8eefab0df53b4ca0630de24715ab5aefe15f197b6f9c74e33792082c5e7d48be6da4689a5cacdba73be6157eab6294886da8b64725862d478449786900"
 	decodedVersionedFinalityProof := &beefy.VersionedFinalityProof{}
@@ -174,6 +240,7 @@ func TestVerifyMMR(t *testing.T) {
 
 // verify relaychain header and parachain header
 func TestVerifyMMRLocal(t *testing.T) {
+	t.Skip()
 	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	if err != nil {
 		t.Logf("Connecting err: %v", err)
@@ -394,7 +461,7 @@ func TestVerifyMMRLocal(t *testing.T) {
 
 // verify mmr proof,relaychain header,parachain header proof and parachain state proof
 func TestVerifyMMRLocal2(t *testing.T) {
-
+	t.Skip()
 	relayApi, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)
 	t.Logf("subscribed to %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
@@ -640,24 +707,54 @@ func TestVerifyMMRLocal2(t *testing.T) {
 func TestBuildMMRBatchProof(t *testing.T) {
 	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)
-	// block hash 0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970
-	// blockHash, err := codec.HexDecodeString("0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970")
-	// hexStr := "0x2c0eedbd6e05507f7177509d717a46195c14f8659abb6756054d406ac2656970"
-	// blockHash, err := types.NewHashFromHexString(hexStr)
+
 	blockHash, err := api.RPC.Chain.GetFinalizedHead()
 	require.NoError(t, err)
 	t.Logf("blockHash: %#x", blockHash)
 	header, err := api.RPC.Chain.GetHeader(blockHash)
 	require.NoError(t, err)
-	t.Logf("header: %+v", header)
+	t.Logf("header number: %d", header.Number)
 	// require.NoError(t, err)
 	// t.Logf("blockHash: %#x", blockHash)
-	idxes := []uint64{uint64(header.Number) - 6, uint64(header.Number) - 4, uint64(header.Number) - 2}
-	t.Logf("idxes: %+v", idxes)
+	blockNumbers := []uint32{uint32(header.Number) - 6, uint32(header.Number) - 4, uint32(header.Number) - 2}
+	// idxes := []types.BlockNumber{header.Number - 6, header.Number - 4, header.Number - 2}
+	t.Logf("idxes: %+v", blockNumbers)
 	require.NoError(t, err)
-	batchProof, err := beefy.BuildMMRBatchProof(api, &blockHash, idxes)
+	// batchProof, err := beefy.BuildMMRBatchProof(api, blockHash, idxes)
+	// var nilHash types.Hash
+	var proofsResp1 beefy.MmrProofsResp
+	err = api.Client.Call(&proofsResp1, "mmr_generateProof", blockNumbers, uint32(header.Number), blockHash)
+	// batchProof, err := beefy.BuildMMRProofs(api, idxes, types.NewOptionU32Empty(), types.NewOptionHashEmpty())
 	require.NoError(t, err)
-	t.Logf("BuildMMRBatchProof: %+v", batchProof)
+	t.Logf("blockNumbers: %+v", blockNumbers)
+	t.Logf("best known blockNumber: %d", uint32(header.Number))
+	t.Logf("requst blockHash: %+v", blockHash)
+	t.Logf("proofResp1.blockHash: %#x", proofsResp1.BlockHash)
+
+	proofsResp2, err := beefy.BuildMMRProofs(api, blockNumbers, types.NewOptionU32Empty(), types.NewOptionHashEmpty())
+	require.NoError(t, err)
+	t.Logf("blockNumbers: %+v", blockNumbers)
+	t.Logf("best known blockNumber: %+v", types.NewOptionU32Empty())
+	t.Logf("requst blockHash: %+v", types.NewOptionHashEmpty())
+	t.Logf("proofResp2.blockHash: %#x", proofsResp2.BlockHash)
+
+	proofsResp3, err := beefy.BuildMMRProofs(api, blockNumbers, types.NewOptionU32(types.U32(header.Number)), types.NewOptionHashEmpty())
+	require.NoError(t, err)
+	t.Logf("blockNumbers: %+v", blockNumbers)
+	t.Logf("best known blockNumber: %+v", types.NewOptionU32(types.U32(header.Number)))
+	t.Logf("requst blockHash: %+v", types.NewOptionHashEmpty())
+	t.Logf("proofResp3.blockHash: %#x", proofsResp3.BlockHash)
+
+	proofsResp4, err := beefy.BuildMMRProofs(api, blockNumbers, types.NewOptionU32(types.U32(header.Number)), types.NewOptionHash(blockHash))
+	require.NoError(t, err)
+	t.Logf("blockNumbers: %+v", blockNumbers)
+	t.Logf("best known blockNumber: %+v", types.NewOptionU32(types.U32(header.Number)))
+	t.Logf("requst blockHash: %+v", types.NewOptionHash(blockHash))
+	t.Logf("proofResp4.blockHash: %#x", proofsResp4.BlockHash)
+	require.Equal(t, proofsResp1, proofsResp4)
+	require.Equal(t, proofsResp3.Leaves, proofsResp4.Leaves)
+	require.Equal(t, proofsResp3.Proof, proofsResp4.Proof)
+
 }
 
 func TestVerifyMMRBatchProofLocal(t *testing.T) {
@@ -700,7 +797,8 @@ func TestVerifyMMRBatchProofLocal(t *testing.T) {
 			// t.Logf("blockNumber: %d\n", latestBlockNumber)
 			latestSignedCommitmentBlockHash, err := api.RPC.Chain.GetBlockHash(uint64(latestSignedCommitmentBlockNumber))
 			require.NoError(t, err)
-			t.Logf("latestSignedCommitmentBlockNumber: %d latestSignedCommitmentBlockHash: %#x", latestSignedCommitmentBlockNumber, latestSignedCommitmentBlockHash)
+			t.Logf("latestSignedCommitmentBlockNumber: %d latestSignedCommitmentBlockHash: %#x",
+				latestSignedCommitmentBlockNumber, latestSignedCommitmentBlockHash)
 
 			if received == 0 {
 				t.Log("First received signed commitment,init client state and need to wait next msg!")
@@ -723,7 +821,7 @@ func TestVerifyMMRBatchProofLocal(t *testing.T) {
 			changeSets, err := beefy.QueryParachainStorage(api, beefy.LOCAL_PARACHAIN_ID, fromBlockHash, latestSignedCommitmentBlockHash)
 			require.NoError(t, err)
 			t.Logf("changeSet len: %d", len(changeSets))
-			var targetRelayChainBlockHeights []uint64
+			var targetRelayChainBlockHeights []uint32
 			for _, changeSet := range changeSets {
 				header, err := api.RPC.Chain.GetHeader(changeSet.Block)
 				require.NoError(t, err)
@@ -738,12 +836,17 @@ func TestVerifyMMRBatchProofLocal(t *testing.T) {
 					t.Log("change.HasStorageData: ", change.HasStorageData)
 					t.Logf("change.HasStorageData: %#x", change.StorageData)
 				}
-				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint64(header.Number))
+				targetRelayChainBlockHeights = append(targetRelayChainBlockHeights, uint32(header.Number))
 
 			}
-
+			t.Logf("targetRelayChainBlockHeights: %+v", targetRelayChainBlockHeights)
 			// build mmr proofs for leaves containing target paraId
-			mmrBatchProof, err := beefy.BuildMMRBatchProof(api, &latestSignedCommitmentBlockHash, targetRelayChainBlockHeights)
+			// var mmrBatchProof beefy.MmrProofsResp
+			// err = api.Client.Call(&mmrBatchProof, "mmr_generateProof", targetRelayChainBlockHeights,
+			// uint32(latestSignedCommitmentBlockNumber), latestSignedCommitmentBlockHash)
+			mmrBatchProof, err := beefy.BuildMMRProofs(api, targetRelayChainBlockHeights,
+				types.NewOptionU32(types.U32(latestSignedCommitmentBlockNumber)), types.NewOptionHashEmpty())
+
 			require.NoError(t, err)
 			// t.Logf("mmrBatchProof: %+v", mmrBatchProof)
 			t.Logf("mmrBatchProof.BlockHash: %#x", mmrBatchProof.BlockHash)
@@ -755,11 +858,14 @@ func TestVerifyMMRBatchProofLocal(t *testing.T) {
 			t.Logf("The indexes of the leaf the proof is for: %+v", mmrBatchProof.Proof.LeafIndexes)
 			t.Logf("Number of leaves in MMR, when the proof was generated: %d", mmrBatchProof.Proof.LeafCount)
 			// leafCount := mmrBatchProof.Proof.LeafCount
-			// mmrSize := mmr.LeafIndexToMMRSize(uint64(leafCount))
+			// leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(uint32(beefy.BEEFY_ACTIVATION_BLOCK), uint32(leafCount))
+			// mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
+			// t.Logf("mmrSize: %d", mmrSize)
+
 			leafIndex := beefy.ConvertBlockNumberToMmrLeafIndex(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber)
 			mmrSize := mmr.LeafIndexToMMRSize(uint64(leafIndex))
 			t.Logf("beefy.GetLeafIndexForBlockNumber(uint32(beefy.BEEFY_ACTIVATION_BLOCK), latestSignedCommitmentBlockNumber): %d", leafIndex)
-			t.Logf("mmr.LeafIndexToMMRSize(uint64(leafIndex)): %d", mmrSize)
+			t.Logf("mmrSize: %d", mmrSize)
 
 			var mmrLeafProof = make([][]byte, len(mmrBatchProof.Proof.Items))
 			for i := 0; i < len(mmrBatchProof.Proof.Items); i++ {

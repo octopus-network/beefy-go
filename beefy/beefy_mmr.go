@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"reflect"
+	"sort"
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/client"
@@ -40,15 +41,15 @@ type MMRBatchProof struct {
 	Items []types.H256
 }
 
-// GenerateMmrBatchProofResponse contains the generate batch proof rpc response
-type GenerateMmrBatchProofResponse struct {
+// MmrProofsResp contains the generate batch proof rpc response
+type MmrProofsResp struct {
 	BlockHash types.H256
 	Leaves    []types.MMRLeaf
 	Proof     MMRBatchProof
 }
 
 // UnmarshalJSON fills u with the JSON encoded byte array given by b
-func (d *GenerateMmrBatchProofResponse) UnmarshalJSON(bz []byte) error {
+func (d *MmrProofsResp) UnmarshalJSON(bz []byte) error {
 	var tmp struct {
 		BlockHash string `json:"blockHash"`
 		Leaves    string `json:"leaves"`
@@ -85,14 +86,97 @@ func (d *GenerateMmrBatchProofResponse) UnmarshalJSON(bz []byte) error {
 
 // GenerateProof retrieves a MMR proof and leaf for the specified leave index, at the given blockHash (useful to query a
 // proof at an earlier block, likely with another MMR root)
-func BuildMMRBatchProof(conn *gsrpc.SubstrateAPI, blockHash *types.Hash, idxes []uint64) (GenerateMmrBatchProofResponse, error) {
-	var batchProofResp GenerateMmrBatchProofResponse
+func BuildMMRBatchProof(conn *gsrpc.SubstrateAPI, blockHash *types.Hash, idxes []uint64) (MmrProofsResp, error) {
+	var batchProofResp MmrProofsResp
 	err := client.CallWithBlockHash(conn.Client, &batchProofResp, "mmr_generateBatchProof", blockHash, idxes)
 	if err != nil {
-		return GenerateMmrBatchProofResponse{}, err
+		return MmrProofsResp{}, err
 	}
 
 	return batchProofResp, nil
+}
+
+// get mmr proofs for the given indexes without blockhash
+func BuildMMRProofs(conn *gsrpc.SubstrateAPI, blockNumbers []uint32, bestKnownBlockNumber types.OptionU32,
+	at types.OptionHash) (MmrProofsResp, error) {
+	var proofsResp MmrProofsResp
+	// var args []interface{}
+
+	// if bestKnownBlockNumber > 0 {
+	ret, bestBlockNumber := bestKnownBlockNumber.Unwrap()
+	if !ret {
+		// generate mmr proof without best blocknumber and blockhash
+		err := conn.Client.Call(&proofsResp, "mmr_generateProof", blockNumbers)
+		if err != nil {
+			return proofsResp, err
+		}
+		return proofsResp, nil
+	}
+
+	sort.SliceStable(blockNumbers, func(i, j int) bool {
+		return blockNumbers[i] < blockNumbers[j]
+	})
+	// best_known_block_number must ET all the blockNumbers
+	if uint32(bestBlockNumber) < blockNumbers[len(blockNumbers)-1] {
+		log.Printf("bestKnownBlockNumber: %d < largest blockNumber: %d", uint32(bestBlockNumber), blockNumbers[len(blockNumbers)-1])
+		return proofsResp, errors.New("best_known_block_number must > all the blockNumbers")
+	}
+	// 	args = append(args, blockNumbers, bestKnownBlockNumber)
+	// } else {
+	// 	// if best_known_block_number <=0, just append indexes
+	// 	args = append(args, blockNumbers, bestKnownBlockNumber)
+	// }
+
+	// if at != nil {
+	// 	hexHash, err := codec.Hex(*at)
+	// 	if err != nil {
+	// 		return proofsResp, err
+	// 	}
+	// 	args = append(args, hexHash)
+	// }
+	// log.Printf("args: %+v", args)
+	// err := conn.Client.Call(&proofsResp, "mmr_generateProof", args...)
+	// if err != nil {
+	// 	return proofsResp, err
+	// }
+	// if bestKnownBlockNumber.IsSome() {
+	// 	ret, bestBlock := bestKnownBlockNumber.Unwrap()
+	// 	if !ret {
+	// 		return proofsResp, errors.New("best known block number invalid")
+	// 	}
+	// 	args = append(args, blockNumbers, bestBlock)
+	// }
+	// log.Printf("blockNumbers: %+v", blockNumbers)
+
+	// encodedBestBlock, err := codec.Encode(bestKnownBlockNumber)
+	// if err != nil {
+	// 	return proofsResp, err
+	// }
+	// log.Printf("encodedBestBlock: %+v", encodedBestBlock)
+
+	// encodedHash, err := codec.Encode(at)
+	// if err != nil {
+	// 	return proofsResp, err
+	// }
+	// log.Printf("encodedHash: %+v", encodedHash)
+
+	// Note that if `best_known_block_number` is provided, then also
+	// specifying the block hash via `at` isn't super-useful here, unless you're generating proof
+	// using non-finalized blocks where there are several competing forks.
+	ret, blockHash := at.Unwrap()
+	if !ret {
+		err := conn.Client.Call(&proofsResp, "mmr_generateProof", blockNumbers, uint32(bestBlockNumber))
+		if err != nil {
+			return proofsResp, err
+		}
+	} else {
+		err := conn.Client.Call(&proofsResp, "mmr_generateProof", blockNumbers, uint32(bestBlockNumber), blockHash)
+		if err != nil {
+			return proofsResp, err
+		}
+	}
+
+	return proofsResp, nil
 }
 
 // verify batch mmr proof
