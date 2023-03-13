@@ -34,10 +34,6 @@ type Signature struct {
 }
 
 func GetBeefyAuthorities(blockHash types.Hash, api *gsrpc.SubstrateAPI, method string) ([][]byte, error) {
-	// blockHash, err := conn.RPC.Chain.GetBlockHash(uint64(blockNumber))
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	// Fetch metadata
 	meta, err := api.RPC.State.GetMetadataLatest()
@@ -79,10 +75,6 @@ func GetBeefyAuthorities(blockHash types.Hash, api *gsrpc.SubstrateAPI, method s
 }
 
 func GetBeefyAuthoritySet(blockHash types.Hash, api *gsrpc.SubstrateAPI, method string) (types.BeefyNextAuthoritySet, error) {
-	// blockHash, err := conn.RPC.Chain.GetBlockHash(uint64(blockNumber))
-	// if err != nil {
-	// 	return nil, err
-	// }
 	var authoritySet types.BeefyNextAuthoritySet
 	// Fetch metadata
 	log.Printf("blockHash: %#v\n", codec.HexEncodeToString(blockHash[:]))
@@ -96,9 +88,6 @@ func GetBeefyAuthoritySet(blockHash types.Hash, api *gsrpc.SubstrateAPI, method 
 		return authoritySet, err
 	}
 	log.Printf("storageKey: %#v\n", codec.HexEncodeToString(storageKey[:]))
-
-	// var authoritySet *grandpa.BeefyAuthoritySet
-	// var authoritySetBytes []byte
 
 	ok, err := api.RPC.State.GetStorage(storageKey, &authoritySet, blockHash)
 	// raw, err := api.RPC.State.GetStorageRaw(storageKey, blockHash)
@@ -132,20 +121,6 @@ func ConvertCommitment(sc types.SignedCommitment) SignedCommitment {
 	}
 	log.Printf("IndexedSignatures: %+v", idxedSigs)
 
-	// convert
-	// var payload []PayloadItem
-	// for _, v := range sc.Commitment.Payload {
-	// 	item := PayloadItem{
-	// 		Id:   v.ID,
-	// 		Data: v.Data,
-	// 	}
-	// 	payload = append(payload, item)
-	// }
-	// comment := Commitment{
-	// 	Payload:        payload,
-	// 	BlockNumber:    sc.Commitment.BlockNumber,
-	// 	ValidatorSetId: sc.Commitment.ValidatorSetID,
-	// }
 	var bsc = SignedCommitment{
 		Commitment: sc.Commitment,
 		Signatures: idxedSigs,

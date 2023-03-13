@@ -9,13 +9,6 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
-type Timestamp struct {
-	// the actual block timestamp
-	Value uint64 `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	// these proof gets from parachain by rpc methord:state_getReadProof
-	Proofs [][]byte `protobuf:"bytes,2,rep,name=proofs,proto3" json:"proofs,omitempty"`
-}
-
 func BuildTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (StateProof, error) {
 	//  get timestamp and proof
 	timestampValue, err := GetTimestampValue(conn, blockHash)
@@ -26,11 +19,7 @@ func BuildTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (StateP
 	if err != nil {
 		return StateProof{}, err
 	}
-	// proofLen := len(timestampProof.Proof)
-	// proofs := make([][]byte, proofLen)
-	// for i := 0; i < proofLen; i++ {
-	// 	copy(proofs[i], timestampProof.Proof[i][:])
-	// }
+
 	proofs := make([][]byte, len(proof.Proof))
 	for i, v := range proof.Proof {
 		// proofs = append(proofs, proof[:])
@@ -74,8 +63,7 @@ func GetTimestampValue(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (types.By
 		return nil, fmt.Errorf("parachain header not found")
 	}
 
-	//TODO: must be encode
-	// use grpc.codec.Encode() or trie_scale.Marshal() ?
+	//Note:must be encode,use grpc.codec.Encode() or trie_scale.Marshal() ?
 	timestampBytes, err := codec.Encode(timestamp)
 	if err != nil {
 		return nil, err

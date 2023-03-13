@@ -81,7 +81,7 @@ func GetParachainIds(conn *gsrpc.SubstrateAPI, blockHash types.Hash) ([]uint32, 
 	}
 
 	if !ok {
-		return nil, fmt.Errorf("beefy authorities not found")
+		return nil, fmt.Errorf("paraids not found")
 	}
 
 	return paraIds, nil
@@ -466,14 +466,6 @@ func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32
 		}
 		log.Printf("solochain BlockNumber: %d", decodeParachainHeader.Number)
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
-
-		//verify timestamp proof
-		// timestampKey := CreateStorageKeyPrefix("Timestamp", "Now")
-		// log.Printf("timestampKey: %#x", timestampKey)
-		// value, err := trie_scale.Marshal(solochainHeader.Timestamp.Value)
-		// if err != nil {
-		// 	return false, err
-		// }
 		log.Printf("-------------- verify timestamp proof ---------------")
 		err = VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], solochainHeader.Timestamp.Key, solochainHeader.Timestamp.Value)
 		log.Printf("VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
@@ -653,12 +645,6 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		log.Printf("parachain BlockNumber: %d", decodeParachainHeader.Number)
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
 
-		// timestampKey := CreateStorageKeyPrefix("Timestamp", "Now")
-		// log.Printf("timestampKey: %#x", timestampKey)
-		// value, err := trie_scale.Marshal(parachainHeader.TimestampProof.Value)
-		// if err != nil {
-		// 	return false, err
-		// }
 		err = VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], parachainHeader.Timestamp.Key, parachainHeader.Timestamp.Value)
 		log.Printf("VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
 		if err != nil {

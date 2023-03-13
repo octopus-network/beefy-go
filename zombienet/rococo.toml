@@ -1,0 +1,47 @@
+[settings]
+node_spawn_timeout = 120
+provider = "native"
+timeout = 600
+
+[relaychain]
+default_command = "polkadot"
+default_args = [ 
+        "-lparachain=debug",
+        "-lbeefy=debug",
+        "--beefy",
+        "--enable-offchain-indexing=true"
+        ]
+chain = "rococo-local"
+
+	[[relaychain.nodes]]
+	name = "alice"
+    validator = true
+	rpc_port = 30444
+    ws_port = 9944
+    args = [
+        # "--unsafe-ws-external",
+        # "--unsafe-rpc-external",
+        "--rpc-external",
+        "--ws-external",
+        # "--rpc-methods=Unsafe",
+        # "--beefy",
+        # "--enable-offchain-indexing=true",
+        # "-lbeefy=debug"
+        ]
+
+	[[relaychain.nodes]]
+	name = "bob"
+	validator = true
+
+	[[relaychain.nodes]]
+	name = "charlie"
+	validator = true
+
+	[[relaychain.nodes]]
+	name = "dave"
+	validator = true
+
+	[[relaychain.nodes]]
+	name = "eve"
+	validator = true
+

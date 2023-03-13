@@ -121,44 +121,6 @@ func BuildMMRProofs(conn *gsrpc.SubstrateAPI, blockNumbers []uint32, bestKnownBl
 		log.Printf("bestKnownBlockNumber: %d < largest blockNumber: %d", uint32(bestBlockNumber), blockNumbers[len(blockNumbers)-1])
 		return proofsResp, errors.New("best_known_block_number must > all the blockNumbers")
 	}
-	// 	args = append(args, blockNumbers, bestKnownBlockNumber)
-	// } else {
-	// 	// if best_known_block_number <=0, just append indexes
-	// 	args = append(args, blockNumbers, bestKnownBlockNumber)
-	// }
-
-	// if at != nil {
-	// 	hexHash, err := codec.Hex(*at)
-	// 	if err != nil {
-	// 		return proofsResp, err
-	// 	}
-	// 	args = append(args, hexHash)
-	// }
-	// log.Printf("args: %+v", args)
-	// err := conn.Client.Call(&proofsResp, "mmr_generateProof", args...)
-	// if err != nil {
-	// 	return proofsResp, err
-	// }
-	// if bestKnownBlockNumber.IsSome() {
-	// 	ret, bestBlock := bestKnownBlockNumber.Unwrap()
-	// 	if !ret {
-	// 		return proofsResp, errors.New("best known block number invalid")
-	// 	}
-	// 	args = append(args, blockNumbers, bestBlock)
-	// }
-	// log.Printf("blockNumbers: %+v", blockNumbers)
-
-	// encodedBestBlock, err := codec.Encode(bestKnownBlockNumber)
-	// if err != nil {
-	// 	return proofsResp, err
-	// }
-	// log.Printf("encodedBestBlock: %+v", encodedBestBlock)
-
-	// encodedHash, err := codec.Encode(at)
-	// if err != nil {
-	// 	return proofsResp, err
-	// }
-	// log.Printf("encodedHash: %+v", encodedHash)
 
 	// Note that if `best_known_block_number` is provided, then also
 	// specifying the block hash via `at` isn't super-useful here, unless you're generating proof
@@ -295,5 +257,18 @@ func VerifyMMRProof(commitment types.Commitment, mmrSize uint64, leafIndex uint6
 	}
 
 	return true, nil
+
+}
+
+// only for polkadot relay chain
+func GetBeefyFinalizedHead(conn *gsrpc.SubstrateAPI) (types.Hash, error) {
+
+	var hash types.Hash
+	err := conn.Client.Call(&hash, "beefy_getFinalizedHead")
+	if err != nil {
+		return types.Hash{}, err
+	}
+
+	return hash, err
 
 }

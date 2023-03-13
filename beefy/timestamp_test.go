@@ -188,6 +188,8 @@ func TestVerifyTimestampProof3(t *testing.T) {
 
 }
 
+// get parachain header state root from relaychain,
+// and use that state root to verify proof from parachian
 func TestVerifyTimestampLocal(t *testing.T) {
 	relayApi, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
 	require.NoError(t, err)

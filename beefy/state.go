@@ -40,10 +40,6 @@ type ReadProof struct {
 
 // UnmarshalJSON fills u with the JSON encoded byte array given by b
 func (d *ReadProofResponse) UnmarshalJSON(bz []byte) error {
-	// var rp struct {
-	// 	At    string `json:"at"`
-	// 	Proof string `json:"proof"`
-	// }
 	var rp ReadProof
 	if err := json.Unmarshal(bz, &rp); err != nil {
 		return err
@@ -56,7 +52,6 @@ func (d *ReadProofResponse) UnmarshalJSON(bz []byte) error {
 	}
 	log.Printf("ReadProofResponse AT: %#x", d.At)
 
-	// d.Proof = make([]types.Bytes, len(rp.Proof))
 	for _, p := range rp.Proof {
 		// var proof types.Bytes
 		proof, err := codec.HexDecodeString(p)
@@ -76,7 +71,6 @@ func GetStateProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash, storageKeys [
 		return rp, err
 	}
 	// log.Printf("read proof: %+v", rp)
-
 	return rp, nil
 }
 
@@ -135,12 +129,6 @@ func GetTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (ReadProo
 	}
 	log.Printf("hexKeys: %+v", hexKeys)
 
-	// err = client.CallWithBlockHash(conn.Client, &rp, "state_getReadProof", &blockHash, hexKeys)
-	// if err != nil {
-	// 	return rp, err
-	// }
-	// // log.Printf("read proof: %+v", rp)
-
 	rp, err = GetStateProof(conn, blockHash, hexKeys)
 	if err != nil {
 		return rp, err
@@ -150,7 +138,7 @@ func GetTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (ReadProo
 }
 
 // verify state proof
-// the value must be scale encoded
+// Note: The value must be scale encoded
 func VerifyStateProof(stateProof [][]byte, stateRoot []byte, key []byte, value []byte) error {
 	//TODO: need marshal?
 	// encodedValue, err := trie_scale.Marshal(value)

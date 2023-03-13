@@ -2,7 +2,6 @@ package beefy
 
 import (
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 )
 
 // local testnet
@@ -140,17 +139,5 @@ func RpcMethods(conn *gsrpc.SubstrateAPI) (RPCMethods, error) {
 	var rpcMethods RPCMethods
 	err := conn.Client.Call(&rpcMethods, "rpc_methods")
 	return rpcMethods, err
-
-}
-
-func GetBeefyFinalizedHead(conn *gsrpc.SubstrateAPI) (types.Hash, error) {
-
-	var hash types.Hash
-	err := conn.Client.Call(&hash, "beefy_getFinalizedHead")
-	if err != nil {
-		return types.Hash{}, err
-	}
-
-	return hash, err
 
 }

@@ -73,13 +73,6 @@ func TestChainInfo(t *testing.T) {
 	for _, m := range methods {
 		t.Logf("%s", m)
 	}
-	beefyFinalizedHeadHash, err := beefy.GetBeefyFinalizedHead(api)
-	require.NoError(t, err)
-
-	beefyFinalizedHeader, err := api.RPC.Chain.GetHeader(beefyFinalizedHeadHash)
-	require.NoError(t, err)
-	t.Logf("beefy finalized head hash: %#x", beefyFinalizedHeadHash)
-	t.Logf("beefy finalized head nubmer: %d", beefyFinalizedHeader.Number)
-	// t.Logf("beefy finalized header: %+v", beefyFinalizedHeader)
+	
 
 }
