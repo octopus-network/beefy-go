@@ -67,6 +67,6 @@ replace github.com/vedhavyas/go-subkey => github.com/vedhavyas/go-subkey v1.0.2
 
 replace github.com/ChainSafe/go-schnorrkel => github.com/ChainSafe/go-schnorrkel v0.0.0-20200405005733-88cbf1b4c40d
 
-replace github.com/centrifuge/go-substrate-rpc-client/v4 => ../../centrifuge/go-substrate-rpc-client
-
+// for dev
+// replace github.com/centrifuge/go-substrate-rpc-client/v4 => ../../centrifuge/go-substrate-rpc-client
 // replace github.com/octopus-network/trie-go => ../trie-go
