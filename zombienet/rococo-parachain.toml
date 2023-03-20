@@ -19,14 +19,8 @@ chain = "rococo-local"
 	rpc_port = 30444
     ws_port = 9944
     args = [
-        # "--unsafe-ws-external",
-        # "--unsafe-rpc-external",
         "--rpc-external",
         "--ws-external",
-        # "--rpc-methods=Unsafe",
-        # "--beefy",
-        # "--enable-offchain-indexing=true",
-        # "-lbeefy=debug"
         ]
 
 	[[relaychain.nodes]]
@@ -48,19 +42,16 @@ chain = "rococo-local"
 [[parachains]]
 id = 2222
 chain = "statemine-local"
+# chain = "local-testnet"
 cumulus_based = true
 
-	# run alice as parachain collator
+	# run Ferdie as parachain collator
 	[[parachains.collators]]
     command = "polkadot-parachain"
     args = [
         "--force-authoring",
-        # "--unsafe-ws-external",
-        # "--unsafe-rpc-external",
         "--rpc-external",
         "--ws-external",
-        # "--rpc-cors=all",
-        # "--rpc-methods=Unsafe"
         ]
 	name = "Ferdie"
 	validator = true
@@ -70,7 +61,7 @@ cumulus_based = true
     name = "RUST_LOG"
     value = "runtime=debug,parachain=trace,cumulus-collator=trace,aura=trace,xcm=trace"
 
-	# run bob as parachain collator
+	# run Boern as parachain collator
 	[[parachains.collators]]
     command = "polkadot-parachain"
 	name = "Boern"
