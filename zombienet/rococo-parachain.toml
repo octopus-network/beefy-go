@@ -9,7 +9,8 @@ default_args = [
         "-lparachain=debug",
         "-lbeefy=debug",
         "--beefy",
-        "--enable-offchain-indexing=true"
+        "--enable-offchain-indexing=true",
+        "--detailed-log-output"
         ]
 chain = "rococo-local"
 
@@ -52,6 +53,7 @@ cumulus_based = true
         "--force-authoring",
         "--rpc-external",
         "--ws-external",
+        "--detailed-log-output"
         ]
 	name = "Ferdie"
 	validator = true

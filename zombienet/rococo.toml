@@ -9,7 +9,8 @@ default_args = [
         "-lparachain=debug",
         "-lbeefy=debug",
         "--beefy",
-        "--enable-offchain-indexing=true"
+        "--enable-offchain-indexing=true",
+		 "--detailed-log-output"
         ]
 chain = "rococo-local"
 
