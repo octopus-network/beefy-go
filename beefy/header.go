@@ -26,9 +26,9 @@ const (
 	CHAINTYPE_PARACHAIN uint32 = 1
 )
 
-type SolochainHeader struct {
+type SubchainHeader struct {
 	// scale-encoded parachain header bytes
-	BlockHeader []byte `protobuf:"bytes,1,opt,name=solochain_header,json=solochainHeader,proto3" json:"solochain_header,omitempty"`
+	BlockHeader []byte `protobuf:"bytes,1,opt,name=subchain_header,json=subchainHeader,proto3" json:"subchain_header,omitempty"`
 	// timestamp and proof
 	// Timestamp Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp"`
 	Timestamp StateProof `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp"`
@@ -389,86 +389,86 @@ func BuildMMRProofFromParaHeaders(paraHeaderWithProofs []ParachainHeader, mmrSiz
 	return mmrProof, nil
 }
 
-func BuildSolochainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64) (map[uint32]SolochainHeader, error) {
+func BuildSubchainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64) (map[uint32]SubchainHeader, error) {
 	leafNum := len(leafIndexes)
-	solochainHeaderMap := make(map[uint32]SolochainHeader)
+	subchainHeaderMap := make(map[uint32]SubchainHeader)
 	for i := 0; i < leafNum; i++ {
-		solochainBlockNumber := uint64(leafIndexes[i])
-		solochainBlockHash, err := conn.RPC.Chain.GetBlockHash(solochainBlockNumber)
+		subchainBlockNumber := uint64(leafIndexes[i])
+		subchainBlockHash, err := conn.RPC.Chain.GetBlockHash(subchainBlockNumber)
 		if err != nil {
 			return nil, err
 		}
-		blockHeader, err := conn.RPC.Chain.GetHeader(solochainBlockHash)
+		blockHeader, err := conn.RPC.Chain.GetHeader(subchainBlockHash)
 		if err != nil {
 			return nil, err
 		}
-		// t.Logf("solochainHeader: %+v", blockHeader)
+		// t.Logf("subchainHeader: %+v", blockHeader)
 		ecodedHeader, err := codec.Encode(blockHeader)
 		if err != nil {
 			return nil, err
 		}
 
 		//  get timestamp and proof
-		timestamp, err := BuildTimestampProof(conn, solochainBlockHash)
+		timestamp, err := BuildTimestampProof(conn, subchainBlockHash)
 		if err != nil {
 			return nil, err
 		}
 		log.Printf("timestamp: %+v", timestamp)
 
 		// build SolochainHeader
-		// solochainBlockHashBytes, err = beefy.Bytes32(solochainBlockHash).Marshal()
+		// subchainBlockHashBytes, err = beefy.Bytes32(subchainBlockHash).Marshal()
 		// require.NoError(t, err)
-		// solochainHeaderMap[uint32(solochainBlockNumber)] = solochainBlockHash[:]
-		solochainHeader := SolochainHeader{
+		// subchainHeaderMap[uint32(subchainBlockNumber)] = subchainBlockHash[:]
+		subchainHeader := SubchainHeader{
 			BlockHeader: ecodedHeader,
 			Timestamp:   timestamp,
 		}
 
-		solochainHeaderMap[uint32(solochainBlockNumber)] = solochainHeader
+		subchainHeaderMap[uint32(subchainBlockNumber)] = subchainHeader
 
 	}
-	return solochainHeaderMap, nil
+	return subchainHeaderMap, nil
 }
 
-//verify solochain header with proofs
-func VerifySolochainHeader(leaves []types.MMRLeaf, solochainHeaderMap map[uint32]SolochainHeader) error {
+//verify subchain header with proofs
+func VerifySubchainHeader(leaves []types.MMRLeaf, subchainHeaderMap map[uint32]SubchainHeader) error {
 
-	//step1:verify solochain header
-	//the leaf parent hash == blake2b256(scale.encode(solochain header))
+	//step1:verify subchain header
+	//the leaf parent hash == blake2b256(scale.encode(subchain header))
 	// leafNum := len(leaves)
 	for _, leaf := range leaves {
-		solochainHeader := solochainHeaderMap[uint32(leaf.ParentNumberAndHash.ParentNumber)]
+		subchainHeader := subchainHeaderMap[uint32(leaf.ParentNumberAndHash.ParentNumber)]
 		blake2b256, err := hash.NewBlake2b256(nil)
 		if err != nil {
 			return err
 		}
-		_, err = blake2b256.Write(solochainHeader.BlockHeader)
+		_, err = blake2b256.Write(subchainHeader.BlockHeader)
 		headHash := blake2b256.Sum(nil)
 		if err != nil {
 			return err
 		}
 		log.Printf("leaf.ParentNumberAndHash.ParentNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
 		log.Printf("mmrLeaf parent Hash: %#x", leaf.ParentNumberAndHash.Hash)
-		log.Printf("solochainHeader.blockHeader blake2b256 hash: %#x", headHash)
+		log.Printf("subchainHeader.blockHeader blake2b256 hash: %#x", headHash)
 		ret := reflect.DeepEqual(headHash, leaf.ParentNumberAndHash.Hash[:])
 
 		if !ret {
 
-			return errors.New("failure to verify solochain header")
+			return errors.New("failure to verify subchain header")
 		}
 
 		//step2:verify timestamp and proof
 		//decode header
 		var decodeParachainHeader types.Header
-		err = codec.Decode(solochainHeader.BlockHeader, &decodeParachainHeader)
+		err = codec.Decode(subchainHeader.BlockHeader, &decodeParachainHeader)
 		if err != nil {
 			return err
 		}
-		log.Printf("solochain BlockNumber: %d", decodeParachainHeader.Number)
+		log.Printf("subchain BlockNumber: %d", decodeParachainHeader.Number)
 		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
 		log.Printf("-------------- verify timestamp proof ---------------")
-		err = VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], solochainHeader.Timestamp.Key, solochainHeader.Timestamp.Value)
-		log.Printf("VerifyStateProof(solochainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
+		err = VerifyStateProof(subchainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], subchainHeader.Timestamp.Key, subchainHeader.Timestamp.Value)
+		log.Printf("VerifyStateProof(subchainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
 		if err != nil {
 			return err
 		}

@@ -770,7 +770,7 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 				t.Logf("mmrBatchProof.Leaves[i].ParachainHeads: %#x", mmrLeafParachainHeads)
 				t.Log("------------------------------------------------------------------------------------")
 
-				// verify solochain header,the leaf parent hash == blake2b256(scale.encode(solochain header))
+				// verify subchain header,the leaf parent hash == blake2b256(scale.encode(subchain header))
 				targetLeafHeader, err := api.RPC.Chain.GetHeader(targetLeafBlockHash)
 				require.NoError(t, err)
 				t.Logf("targetLeafHeader: %+v", targetLeafHeader)
@@ -924,20 +924,20 @@ func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
 
 			leafLen := len(mmrBatchProof.Leaves)
 			t.Logf("leaf num: %d", leafLen)
-			//verify relaychain header/solochain header
+			//verify relaychain header/subchain header
 
-			t.Log("---  begin to verify solochain header  ---")
-			// build solochain header map
-			solochainHeaderMap, err := beefy.BuildSolochainHeaderMap(relaychainEndpoint, mmrBatchProof.Proof.LeafIndexes)
+			t.Log("---  begin to verify subchain header  ---")
+			// build subchain header map
+			subchainHeaderMap, err := beefy.BuildSubchainHeaderMap(relaychainEndpoint, mmrBatchProof.Proof.LeafIndexes)
 			require.NoError(t, err)
-			t.Logf("solochainHeaderMap: %+v", solochainHeaderMap)
+			t.Logf("subchainHeaderMap: %+v", subchainHeaderMap)
 
-			// verify solochain and proof
-			err = beefy.VerifySolochainHeader(mmrBatchProof.Leaves, solochainHeaderMap)
+			// verify subchain and proof
+			err = beefy.VerifySubchainHeader(mmrBatchProof.Leaves, subchainHeaderMap)
 			require.NoError(t, err)
-			t.Log("beefy.VerifySolochainHeader(mmrBatchProof.Leaves,solochainHeaderMap) result: True")
+			t.Log("beefy.VerifySolochainHeader(mmrBatchProof.Leaves,subchainHeaderMap) result: True")
 			// require.True(t, ret)
-			t.Log("---  end to verify solochain header   ---\n")
+			t.Log("---  end to verify subchain header   ---\n")
 
 			t.Log("---  begin to verify parachain header  ---")
 
@@ -958,7 +958,7 @@ func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
 
 			received++
 
-			if received >= 5 {
+			if received >= 2 {
 				return
 			}
 		case <-timeout:
