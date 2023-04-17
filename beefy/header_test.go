@@ -389,7 +389,7 @@ func TestBuildAndVerifyParaHeaderProofLocal1(t *testing.T) {
 	// beefy.VerifyParaChainHeaderProofs()
 }
 
-//TODO: fix build mmr proof from header
+// TODO: fix build mmr proof from header
 func TestBuildAndVerifyParaHeaderProofLocal2(t *testing.T) {
 	t.Skip("fix build mmr proof from header")
 	api, err := gsrpc.NewSubstrateAPI(beefy.LOCAL_RELAY_ENDPPOIT)
@@ -928,7 +928,7 @@ func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
 
 			t.Log("---  begin to verify subchain header  ---")
 			// build subchain header map
-			subchainHeaderMap, err := beefy.BuildSubchainHeaderMap(relaychainEndpoint, mmrBatchProof.Proof.LeafIndexes)
+			subchainHeaderMap, err := beefy.BuildSubchainHeaderMap(relaychainEndpoint, mmrBatchProof.Proof.LeafIndexes, "sub-0")
 			require.NoError(t, err)
 			t.Logf("subchainHeaderMap: %+v", subchainHeaderMap)
 
@@ -943,7 +943,7 @@ func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
 
 			// build parachain header proof and verify that proof
 			parachainHeaderMap, err := beefy.BuildParachainHeaderMap(relaychainEndpoint, parachainEndpoint,
-				mmrBatchProof.Proof.LeafIndexes, beefy.LOCAL_PARACHAIN_ID)
+				mmrBatchProof.Proof.LeafIndexes, "astar-0", beefy.LOCAL_PARACHAIN_ID)
 			require.NoError(t, err)
 			t.Logf("parachainHeaderMap: %+v", parachainHeaderMap)
 			err = beefy.VerifyParachainHeader(mmrBatchProof.Leaves, parachainHeaderMap)

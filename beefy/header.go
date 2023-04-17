@@ -27,6 +27,7 @@ const (
 )
 
 type SubchainHeader struct {
+	ChainId string `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	// scale-encoded parachain header bytes
 	BlockHeader []byte `protobuf:"bytes,1,opt,name=subchain_header,json=subchainHeader,proto3" json:"subchain_header,omitempty"`
 	// timestamp and proof
@@ -34,7 +35,7 @@ type SubchainHeader struct {
 	Timestamp StateProof `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp"`
 }
 
-/// Parachain headers and their merkle proofs.
+// / Parachain headers and their merkle proofs.
 type ParachainHeaders struct {
 	// map<blocknumber,ParachainHeader>
 	ParachainHeaderMap map[uint32]*ParachainHeader `json:"parachain_header_map,omitempty"`
@@ -42,6 +43,9 @@ type ParachainHeaders struct {
 
 // data needed to prove parachain header inclusion in mmr
 type ParachainHeader struct {
+	// chain_id string type, eg: ibc-1,astar-1
+	ChainId string `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+
 	ParaId uint32 `json:"para_id,omitempty"`
 	// scale-encoded parachain header bytes
 	BlockHeader []byte `json:"parachain_header,omitempty"`
@@ -389,7 +393,7 @@ func BuildMMRProofFromParaHeaders(paraHeaderWithProofs []ParachainHeader, mmrSiz
 	return mmrProof, nil
 }
 
-func BuildSubchainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64) (map[uint32]SubchainHeader, error) {
+func BuildSubchainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, chainId string) (map[uint32]SubchainHeader, error) {
 	leafNum := len(leafIndexes)
 	subchainHeaderMap := make(map[uint32]SubchainHeader)
 	for i := 0; i < leafNum; i++ {
@@ -420,6 +424,7 @@ func BuildSubchainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64) (
 		// require.NoError(t, err)
 		// subchainHeaderMap[uint32(subchainBlockNumber)] = subchainBlockHash[:]
 		subchainHeader := SubchainHeader{
+			ChainId:     chainId,
 			BlockHeader: ecodedHeader,
 			Timestamp:   timestamp,
 		}
@@ -430,7 +435,7 @@ func BuildSubchainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64) (
 	return subchainHeaderMap, nil
 }
 
-//verify subchain header with proofs
+// verify subchain header with proofs
 func VerifySubchainHeader(leaves []types.MMRLeaf, subchainHeaderMap map[uint32]SubchainHeader) error {
 
 	//step1:verify subchain header
@@ -479,9 +484,9 @@ func VerifySubchainHeader(leaves []types.MMRLeaf, subchainHeaderMap map[uint32]S
 
 }
 
-//build parachain header map
+// build parachain header map
 func BuildParachainHeaderMap(relaychainEndpoint *gsrpc.SubstrateAPI, parachainEndpoint *gsrpc.SubstrateAPI,
-	leafIndexes []types.U64, targetParachainId uint32) (map[uint32]ParachainHeader, error) {
+	leafIndexes []types.U64, chainId string, targetParachainId uint32) (map[uint32]ParachainHeader, error) {
 	leafNum := len(leafIndexes)
 	parachainHeaderMap := make(map[uint32]ParachainHeader)
 
@@ -582,6 +587,7 @@ func BuildParachainHeaderMap(relaychainEndpoint *gsrpc.SubstrateAPI, parachainEn
 		log.Printf("timestamp: %+v", timestamp)
 
 		parachainHeader := ParachainHeader{
+			ChainId:     chainId,
 			ParaId:      targetParachainId,
 			BlockHeader: targetParachainHeader,
 			Proof:       targetParachainHeaderProof,
@@ -595,7 +601,7 @@ func BuildParachainHeaderMap(relaychainEndpoint *gsrpc.SubstrateAPI, parachainEn
 	return parachainHeaderMap, nil
 }
 
-//verify parachain header with proofs
+// verify parachain header with proofs
 func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32]ParachainHeader) error {
 
 	//step1:verify parachain header

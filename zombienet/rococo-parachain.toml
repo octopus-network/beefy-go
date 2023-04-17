@@ -41,7 +41,7 @@ chain = "rococo-local"
 	validator = true
 
 [[parachains]]
-id = 2222
+id = 2000
 chain = "statemine-local"
 # chain = "local-testnet"
 cumulus_based = true
