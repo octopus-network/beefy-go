@@ -22,12 +22,14 @@ import (
 
 // chain type
 const (
-	CHAINTYPE_SOLOCHAIN uint32 = 0
+	CHAINTYPE_SUBCHAIN uint32 = 0
 	CHAINTYPE_PARACHAIN uint32 = 1
 )
 
 type SubchainHeader struct {
 	ChainId string `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// block number(height)
+	BlockNumber uint32 `protobuf:"varint,3,opt,name=block_number,json=blockNumber,proto3" json:"block_number,omitempty"`
 	// scale-encoded parachain header bytes
 	BlockHeader []byte `protobuf:"bytes,1,opt,name=subchain_header,json=subchainHeader,proto3" json:"subchain_header,omitempty"`
 	// timestamp and proof
@@ -47,6 +49,10 @@ type ParachainHeader struct {
 	ChainId string `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 
 	ParaId uint32 `json:"para_id,omitempty"`
+
+	// This block number is relayer chain blocknumber that parachain header packed into relayer block
+	RelayerChainNumber uint32 `protobuf:"varint,3,opt,name=block_number,json=blockNumber,proto3" json:"block_number,omitempty"`
+
 	// scale-encoded parachain header bytes
 	BlockHeader []byte `json:"parachain_header,omitempty"`
 	// proofs for parachain header in the mmr_leaf.parachain_heads
@@ -435,6 +441,51 @@ func BuildSubchainHeaderMap(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, c
 	return subchainHeaderMap, nil
 }
 
+func BuildSubchainHeaders(conn *gsrpc.SubstrateAPI, leafIndexes []types.U64, chainId string) ([]SubchainHeader, error) {
+
+	leafNum := len(leafIndexes)
+	var subchainHeaders []SubchainHeader
+
+	for i := 0; i < leafNum; i++ {
+		subchainBlockNumber := uint64(leafIndexes[i])
+		subchainBlockHash, err := conn.RPC.Chain.GetBlockHash(subchainBlockNumber)
+		if err != nil {
+			return nil, err
+		}
+		blockHeader, err := conn.RPC.Chain.GetHeader(subchainBlockHash)
+		if err != nil {
+			return nil, err
+		}
+		// t.Logf("subchainHeader: %+v", blockHeader)
+		ecodedHeader, err := codec.Encode(blockHeader)
+		if err != nil {
+			return nil, err
+		}
+
+		//  get timestamp and proof
+		timestamp, err := BuildTimestampProof(conn, subchainBlockHash)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("timestamp: %+v", timestamp)
+
+		// build SolochainHeader
+		// subchainBlockHashBytes, err = beefy.Bytes32(subchainBlockHash).Marshal()
+		// require.NoError(t, err)
+		// subchainHeaderMap[uint32(subchainBlockNumber)] = subchainBlockHash[:]
+		subchainHeader := SubchainHeader{
+			ChainId:     chainId,
+			BlockNumber: uint32(subchainBlockNumber),
+			BlockHeader: ecodedHeader,
+			Timestamp:   timestamp,
+		}
+
+		subchainHeaders = append(subchainHeaders, subchainHeader)
+
+	}
+	return subchainHeaders, nil
+}
+
 // verify subchain header with proofs
 func VerifySubchainHeader(leaves []types.MMRLeaf, subchainHeaderMap map[uint32]SubchainHeader) error {
 
@@ -601,6 +652,124 @@ func BuildParachainHeaderMap(relaychainEndpoint *gsrpc.SubstrateAPI, parachainEn
 	return parachainHeaderMap, nil
 }
 
+// build parachain header map
+func BuildParachainHeaders(relaychainEndpoint *gsrpc.SubstrateAPI, parachainEndpoint *gsrpc.SubstrateAPI,
+	leafIndexes []types.U64, chainId string, targetParachainId uint32) ([]ParachainHeader, error) {
+	leafNum := len(leafIndexes)
+	var parachainHeaders []ParachainHeader
+
+	for i := 0; i < leafNum; i++ {
+		targetLeafIndex := uint64(leafIndexes[i])
+		targetLeafBlockHash, err := relaychainEndpoint.RPC.Chain.GetBlockHash(targetLeafIndex)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("targetLeafIndex: %d targetLeafBlockHash: %#x", targetLeafIndex, targetLeafBlockHash)
+		paraChainIds, err := GetParachainIds(relaychainEndpoint, targetLeafBlockHash)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("parachainIds: %+v", paraChainIds)
+		var encodedheaderMap = make(map[uint32][]byte, len(paraChainIds))
+		//find relayer header that includes all the target parachain header
+		for _, parachainId := range paraChainIds {
+			encodedHeader, err := GetParachainHeader(relaychainEndpoint, uint32(parachainId), targetLeafBlockHash)
+			if err != nil {
+				return nil, err
+			}
+			// t.Logf("paraChainId: %d", paraChainId)
+			log.Printf("parachainId: %d parachainHeader: %#x", parachainId, encodedHeader)
+			encodedheaderMap[parachainId] = encodedHeader
+		}
+		log.Printf("paraChainHeaderMap: %+v", encodedheaderMap)
+		// sort by paraId
+		var sortedParachainIds []uint32
+		for parachainId := range encodedheaderMap {
+			sortedParachainIds = append(sortedParachainIds, parachainId)
+		}
+		sort.SliceStable(sortedParachainIds, func(i, j int) bool {
+			return sortedParachainIds[i] < sortedParachainIds[j]
+		})
+		log.Printf("sortedParaIds: %+v", sortedParachainIds)
+
+		var parachainHeaderLeaves [][]byte
+		var targetHeaderIndex uint32
+
+		count := 0
+		for _, parachainId := range sortedParachainIds {
+			encodedParaHeader, err := codec.Encode(ParaIdAndHeader{
+				ParaId: parachainId,
+				Header: encodedheaderMap[parachainId]})
+			if err != nil {
+				return nil, err
+			}
+			// get parachainheader Keccak256 hash
+			parachainHeaderLeaf := crypto.Keccak256(encodedParaHeader)
+			parachainHeaderLeaves = append(parachainHeaderLeaves, parachainHeaderLeaf)
+			if parachainId == targetParachainId {
+				// find the index of target parachain id
+				targetHeaderIndex = uint32(count)
+				log.Printf("targetHeaderIndex: %d", targetHeaderIndex)
+			}
+			count++
+		}
+		log.Printf("parachainHeaderLeaves: %+v", parachainHeaderLeaves)
+		// build merkle tree from all the paraheader leaves
+		tree, err := merkle.NewTree(hasher.Keccak256Hasher{}).FromLeaves(parachainHeaderLeaves)
+		if err != nil {
+			return nil, err
+		}
+
+		// build merkle tree from target parachain proof
+		targetParachainHeader := encodedheaderMap[targetParachainId]
+		targetParachainHeaderTree := tree.Proof([]uint64{uint64(targetHeaderIndex)})
+		log.Printf("targetParachainHeaderTree: %+v", targetParachainHeaderTree)
+		targetParachainHeaderProof := targetParachainHeaderTree.ProofHashes()
+		log.Printf("targetParachainHeaderProof: %+v", targetParachainHeaderProof)
+		parachainHeaderTotalCount := uint32(len(parachainHeaderLeaves))
+
+		//  get timestamp and proof
+		var decodeParachainHeader types.Header
+		err = codec.Decode(targetParachainHeader, &decodeParachainHeader)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("parachain BlockNumber: %d", decodeParachainHeader.Number)
+		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
+
+		// switch to parachain endpoint
+		// parachainEndpoint, err := gsrpc.NewSubstrateAPI(LOCAL_PARACHAIN_ENDPOINT)
+		if err != nil {
+			return nil, err
+		}
+		blockHash, err := parachainEndpoint.RPC.Chain.GetBlockHash(uint64(decodeParachainHeader.Number))
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("parachain blockHash: %#x ", blockHash)
+
+		timestamp, err := BuildTimestampProof(parachainEndpoint, blockHash)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("timestamp: %+v", timestamp)
+
+		parachainHeader := ParachainHeader{
+			ChainId:            chainId,
+			ParaId:             targetParachainId,
+			RelayerChainNumber: uint32(targetLeafIndex),
+			BlockHeader:        targetParachainHeader,
+			Proof:              targetParachainHeaderProof,
+			HeaderIndex:        targetHeaderIndex,
+			HeaderCount:        parachainHeaderTotalCount,
+			Timestamp:          timestamp,
+		}
+		parachainHeaders = append(parachainHeaders, parachainHeader)
+	}
+
+	return parachainHeaders, nil
+}
+
 // verify parachain header with proofs
 func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32]ParachainHeader) error {
 
@@ -631,7 +800,7 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		// verify new merkle root == mmrLeafParachainHeads
 		log.Printf("------------------------------------------------------------------------------------")
 		log.Printf("leaf.ParentNumberAndHash.ParentNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
-		log.Printf("parachain blockNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
+		// log.Printf("parachain blockNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
 		log.Printf("leaf.ParachainHeads: %#x", leaf.ParachainHeads)
 		log.Printf("cal parachainHeadsRoot: %#x", parachainHeadsRoot)
 		log.Printf("------------------------------------------------------------------------------------")
