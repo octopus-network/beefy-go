@@ -28,29 +28,29 @@ import (
 )
 
 func TestDecodeParachainHeader(t *testing.T) {
-	headerBytes, err := hex.DecodeString("7edf044b273544342c4dc30a234c327405b3b03f2f20f53fc6a41d6d2765536d38efc4d9b628f9ddb17b542822e3df456b5431c62a005a67bb593d30da23f2e57581004e468f3616573199929694b06fc4248c449621f1e04b7c1dc3135bc1f6e9080642414245340200000000bdaca9200000000005424142450101b4061c25a6260134de85942c551d75d7e29e660a8b090a4ec08051b32dad7253e7536a1214d06648c865a44a10ffd7a457f8d62c5783b55fd29d0faa1912c885")
+	headerBytes, err := hex.DecodeString("e102d90f400ff2253268a3025685f884dcc804d40871929998b083a9bf2cbee3c6cfed017f4d9b48dfc57905fae71b366a2078b6de4a580d1c9c7df8a7fed9bf7ac5e295ceed0096eaaae75144c0048093c959274f1ccd753d3db34d18138cec907cccfe080661757261207aa05c080000000005617572610101e6d19993d90d1646568c5089ed21d8265886fdeb2261d3169e7551b08eb74a7772983dbd6b0ebcf1287011500f1acf70522baf08623758820181dfc70c6a3589")
 	require.NoError(t, err, "error decoding parachain bytes")
-
-	var header types.Header
-	err = codec.Decode(headerBytes, &header)
+	var decodedHeader types.Header
+	err = codec.Decode(headerBytes, &decodedHeader)
 	require.NoError(t, err, "error decoding parachain header")
+	t.Logf("decodedHeader: %+v", decodedHeader)
 
 	parentHash, err := hex.DecodeString("7edf044b273544342c4dc30a234c327405b3b03f2f20f53fc6a41d6d2765536d")
 	require.NoError(t, err)
 
-	require.Equal(t, header.ParentHash[:], parentHash[:], "error comparing decoded parent hash")
+	require.Equal(t, decodedHeader.ParentHash[:], parentHash[:], "error comparing decoded parent hash")
 
 	extrinsicsRoot, err := hex.DecodeString("81004e468f3616573199929694b06fc4248c449621f1e04b7c1dc3135bc1f6e9")
 	require.NoError(t, err)
 
-	require.Equal(t, header.ExtrinsicsRoot[:], extrinsicsRoot[:], "error comparing extrinsicsRoot")
+	require.Equal(t, decodedHeader.ExtrinsicsRoot[:], extrinsicsRoot[:], "error comparing extrinsicsRoot")
 
 	stateRoot, err := hex.DecodeString("efc4d9b628f9ddb17b542822e3df456b5431c62a005a67bb593d30da23f2e575")
 	require.NoError(t, err)
 
-	require.Equal(t, header.StateRoot[:], stateRoot[:], "error comparing StateRoot")
+	require.Equal(t, decodedHeader.StateRoot[:], stateRoot[:], "error comparing StateRoot")
 
-	require.Equal(t, types.BlockNumber(types.NewU32(14)), header.Number, "failed to check block number from decoded header")
+	require.Equal(t, types.BlockNumber(types.NewU32(14)), decodedHeader.Number, "failed to check block number from decoded header")
 
 }
 
@@ -915,7 +915,7 @@ func TestBuildAndVerifyParaHeaderProofLocal4(t *testing.T) {
 
 			//verify mmr batch proof
 			t.Log("---  begin to verify mmr batch proof  ---")
-			result, err := beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload,
+			result, err := beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0].Data,
 				mmrSize, mmrBatchProof.Leaves, mmrBatchProof.Proof)
 			require.NoError(t, err)
 			t.Logf("beefy.VerifyMMRBatchProof(s.SignedCommitment.Commitment.Payload[0], mmrSize,mmrBatchProof.Leaves, mmrBatchProof.Proof) result: %+v", result)

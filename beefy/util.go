@@ -113,7 +113,7 @@ func ConvertMmrLeafIndexToBlockNumber(beefyActivationBlock uint32, leafIndex uin
 	return blockNumber
 }
 
-// ConvertBlockNumberToMmrLeafIndex given the MmrLeafPartial.ParentNumber & BeefyActivationBlock,
+// ConvertBlockNumberToMmrLeafIndex given the blockNumber & BeefyActivationBlock,
 func ConvertBlockNumberToMmrLeafIndex(beefyActivationBlock uint32, blockNumber uint32) uint64 {
 	var leafIndex uint32
 

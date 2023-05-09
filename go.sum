@@ -201,6 +201,8 @@ github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416/go.mod h1:NBIhNtsFMo
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/octopus-network/trie-go v0.1.0 h1:NRvaRac2H3Q5wnEjyMEFahjV34SDccGb1nzxm5PkqZo=
 github.com/octopus-network/trie-go v0.1.0/go.mod h1:eiq61zcvD66lXiMHJCX3dy6BkhAg4S8KVqffsLWFIsg=
+github.com/octopus-network/trie-go v0.2.0 h1:Ere07MuswFMX3yUwbnuL7P1pUbuAVIEN4GMSZvQLLI4=
+github.com/octopus-network/trie-go v0.2.0/go.mod h1:eiq61zcvD66lXiMHJCX3dy6BkhAg4S8KVqffsLWFIsg=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=

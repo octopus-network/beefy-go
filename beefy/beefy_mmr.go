@@ -142,49 +142,41 @@ func BuildMMRProofs(conn *gsrpc.SubstrateAPI, blockNumbers []uint32, bestKnownBl
 }
 
 // verify batch mmr proof
-func VerifyMMRBatchProof(payloads []types.PayloadItem, mmrSize uint64, mmrLeaves []types.MMRLeaf, mmrbatchProof MMRBatchProof) (bool, error) {
-	for _, payload := range payloads {
-		mmrRootID := []byte("mh")
-		log.Printf("\nmmrRootID: %s\npayload.ID: %s", mmrRootID, payload.ID)
-		// checks for the right payloadId
-		if bytes.Equal(payload.ID[:], mmrRootID) {
-			leafNum := len(mmrLeaves)
-			var leaves = make([]merkletypes.Leaf, leafNum)
-			for i := 0; i < leafNum; i++ {
-				// scale encode the mmr leaf
-				encodedMMRLeaf, err := codec.Encode(mmrLeaves[i])
-				if err != nil {
-					return false, err
-				}
-				log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
-				leaf := merkletypes.Leaf{
-					Hash:  crypto.Keccak256(encodedMMRLeaf),
-					Index: uint64(mmrbatchProof.LeafIndexes[i]),
-				}
-				leaves[i] = leaf
-			}
-
-			var proofItmes = make([][]byte, len(mmrbatchProof.Items))
-			for i := 0; i < len(mmrbatchProof.Items); i++ {
-				proofItmes[i] = mmrbatchProof.Items[i][:]
-			}
-
-			mmrProof := mmr.NewProof(mmrSize, proofItmes, leaves, hasher.Keccak256Hasher{})
-			calMMRRoot, err := mmrProof.CalculateRoot()
-
-			if err != nil {
-				return false, err
-			}
-
-			log.Printf("cal mmr root:%#x", calMMRRoot)
-			log.Printf("payload.Data:%#x", payload.Data)
-			ret := reflect.DeepEqual(calMMRRoot, payload.Data)
-			log.Printf("reflect.DeepEqual result :%#v", ret)
-			if !ret {
-				return false, errors.New("failure to verfify mmr")
-			}
-
+func VerifyMMRBatchProof(mmrRoot []byte, mmrSize uint64, mmrLeaves []types.MMRLeaf, mmrbatchProof MMRBatchProof) (bool, error) {
+	leafNum := len(mmrLeaves)
+	var leaves = make([]merkletypes.Leaf, leafNum)
+	for i := 0; i < leafNum; i++ {
+		// scale encode the mmr leaf
+		encodedMMRLeaf, err := codec.Encode(mmrLeaves[i])
+		if err != nil {
+			return false, err
 		}
+		// log.Printf("encodedMMRLeaf: %#x", encodedMMRLeaf)
+		leaf := merkletypes.Leaf{
+			Hash:  crypto.Keccak256(encodedMMRLeaf),
+			Index: uint64(mmrbatchProof.LeafIndexes[i]),
+		}
+		leaves[i] = leaf
+	}
+
+	var proofItmes = make([][]byte, len(mmrbatchProof.Items))
+	for i := 0; i < len(mmrbatchProof.Items); i++ {
+		proofItmes[i] = mmrbatchProof.Items[i][:]
+	}
+
+	mmrProof := mmr.NewProof(mmrSize, proofItmes, leaves, hasher.Keccak256Hasher{})
+	calMMRRoot, err := mmrProof.CalculateRoot()
+
+	if err != nil {
+		return false, err
+	}
+
+	log.Printf("beefy-go::VerifyMMRBatchProof -> cal mmr root:%#x", calMMRRoot)
+	log.Printf("beefy-go::VerifyMMRBatchProof -> expected mmr root :%#x", mmrRoot)
+	ret := reflect.DeepEqual(calMMRRoot, mmrRoot)
+	log.Printf("beefy-go::VerifyMMRBatchProof -> reflect.DeepEqual result :%#v", ret)
+	if !ret {
+		return false, errors.New("the cal mmr root != expected mmr root")
 	}
 
 	return true, nil

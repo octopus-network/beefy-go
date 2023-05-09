@@ -22,7 +22,7 @@ import (
 
 // chain type
 const (
-	CHAINTYPE_SUBCHAIN uint32 = 0
+	CHAINTYPE_SUBCHAIN  uint32 = 0
 	CHAINTYPE_PARACHAIN uint32 = 1
 )
 
@@ -35,6 +35,8 @@ type SubchainHeader struct {
 	// timestamp and proof
 	// Timestamp Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp"`
 	Timestamp StateProof `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp"`
+	// mmr proof for header
+	// MmrLeavesAndBatchProof MMRLeavesAndBatchProof `protobuf:"bytes,9,opt,name=mmr_leaves_and_batch_proof,json=mmrLeavesAndBatchProof,proto3" json:"mmr_leaves_and_batch_proof"`
 }
 
 // / Parachain headers and their merkle proofs.
@@ -64,6 +66,8 @@ type ParachainHeader struct {
 	// timestamp and proof
 	// Timestamp Timestamp `json:"timestamp,omitempty"`
 	Timestamp StateProof `json:"timestamp,omitempty"`
+	// mmr proof for header
+	// MmrLeavesAndBatchProof MMRLeavesAndBatchProof `protobuf:"bytes,9,opt,name=mmr_leaves_and_batch_proof,json=mmrLeavesAndBatchProof,proto3" json:"mmr_leaves_and_batch_proof"`
 }
 
 type ParaIdAndHeader struct {
@@ -503,11 +507,11 @@ func VerifySubchainHeader(leaves []types.MMRLeaf, subchainHeaderMap map[uint32]S
 		if err != nil {
 			return err
 		}
-		log.Printf("leaf.ParentNumberAndHash.ParentNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
-		log.Printf("mmrLeaf parent Hash: %#x", leaf.ParentNumberAndHash.Hash)
-		log.Printf("subchainHeader.blockHeader blake2b256 hash: %#x", headHash)
+		log.Printf("beefy-go::VerifySubchainHeader -> leaf.ParentNumberAndHash.ParentNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
+		log.Printf("beefy-go::VerifySubchainHeader -> mmrLeaf parent Hash: %#x", leaf.ParentNumberAndHash.Hash)
+		log.Printf("beefy-go::VerifySubchainHeader -> subchainHeader.blockHeader blake2b256 hash: %#x", headHash)
 		ret := reflect.DeepEqual(headHash, leaf.ParentNumberAndHash.Hash[:])
-
+		log.Printf("beefy-go::VerifySubchainHeader -> verify subchain header result %+v", ret)
 		if !ret {
 
 			return errors.New("failure to verify subchain header")
@@ -515,16 +519,15 @@ func VerifySubchainHeader(leaves []types.MMRLeaf, subchainHeaderMap map[uint32]S
 
 		//step2:verify timestamp and proof
 		//decode header
-		var decodeParachainHeader types.Header
-		err = codec.Decode(subchainHeader.BlockHeader, &decodeParachainHeader)
+		var decodeHeader types.Header
+		err = codec.Decode(subchainHeader.BlockHeader, &decodeHeader)
 		if err != nil {
 			return err
 		}
-		log.Printf("subchain BlockNumber: %d", decodeParachainHeader.Number)
-		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
-		log.Printf("-------------- verify timestamp proof ---------------")
-		err = VerifyStateProof(subchainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], subchainHeader.Timestamp.Key, subchainHeader.Timestamp.Value)
-		log.Printf("VerifyStateProof(subchainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
+		log.Printf("beefy-go::VerifySubchainHeader -> subchain BlockNumber: %d", decodeHeader.Number)
+		log.Printf("beefy-go::VerifySubchainHeader -> decodeHeader.StateRoot: %#x", decodeHeader.StateRoot)
+		err = VerifyStateProof(subchainHeader.Timestamp.Proofs, decodeHeader.StateRoot[:], subchainHeader.Timestamp.Key, subchainHeader.Timestamp.Value)
+		log.Printf("beefy-go::VerifySubchainHeader -> verify timestamp proof result: %+v", ret)
 		if err != nil {
 			return err
 		}
@@ -773,7 +776,6 @@ func BuildParachainHeaders(relaychainEndpoint *gsrpc.SubstrateAPI, parachainEndp
 // verify parachain header with proofs
 func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32]ParachainHeader) error {
 
-	//step1:verify parachain header
 	for _, leaf := range leaves {
 		parachainHeader := ParachainHeaderMap[uint32(leaf.ParentNumberAndHash.ParentNumber)]
 		encodedParachainHeader, err := codec.Encode(ParaIdAndHeader{ParaId: parachainHeader.ParaId, Header: parachainHeader.BlockHeader})
@@ -798,13 +800,12 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 		}
 
 		// verify new merkle root == mmrLeafParachainHeads
-		log.Printf("------------------------------------------------------------------------------------")
-		log.Printf("leaf.ParentNumberAndHash.ParentNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
+		log.Printf("beefy-go::VerifyParachainHeader -> leaf.ParentNumberAndHash.ParentNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
 		// log.Printf("parachain blockNumber: %d", leaf.ParentNumberAndHash.ParentNumber)
-		log.Printf("leaf.ParachainHeads: %#x", leaf.ParachainHeads)
-		log.Printf("cal parachainHeadsRoot: %#x", parachainHeadsRoot)
-		log.Printf("------------------------------------------------------------------------------------")
+		log.Printf("beefy-go::VerifyParachainHeader -> leaf.ParachainHeads: %#x", leaf.ParachainHeads)
+		log.Printf("beefy-go::VerifyParachainHeader -> cal parachainHeadsRoot: %#x", parachainHeadsRoot)
 		ret := reflect.DeepEqual(parachainHeadsRoot, leaf.ParachainHeads[:])
+		log.Printf("beefy-go::VerifyParachainHeader -> verify parachain header result %+v", ret)
 		if !ret {
 
 			return errors.New("failure to verify parachain header")
@@ -812,16 +813,17 @@ func VerifyParachainHeader(leaves []types.MMRLeaf, ParachainHeaderMap map[uint32
 
 		//verify timestamp proof
 		//decode parachain header
-		var decodeParachainHeader types.Header
-		err = codec.Decode(parachainHeader.BlockHeader, &decodeParachainHeader)
+		var decodeHeader types.Header
+		err = codec.Decode(parachainHeader.BlockHeader, &decodeHeader)
 		if err != nil {
 			return err
 		}
-		log.Printf("parachain BlockNumber: %d", decodeParachainHeader.Number)
-		log.Printf("decodeParachainHeader.StateRoot: %#x", decodeParachainHeader.StateRoot)
+		log.Printf("beefy-go::VerifyParachainHeader -> parachain BlockNumber: %d", decodeHeader.Number)
+		log.Printf("beefy-go::VerifyParachainHeader -> decodeHeader.StateRoot: %#x", decodeHeader.StateRoot)
 
-		err = VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], parachainHeader.Timestamp.Key, parachainHeader.Timestamp.Value)
-		log.Printf("VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeParachainHeader.StateRoot[:], timestampKey, value) result: %+v", ret)
+		err = VerifyStateProof(parachainHeader.Timestamp.Proofs, decodeHeader.StateRoot[:], parachainHeader.Timestamp.Key, parachainHeader.Timestamp.Value)
+		log.Printf("beefy-go::VerifyParachainHeader -> verify timestamp proof result: %+v", ret)
+
 		if err != nil {
 			return err
 		}

@@ -193,11 +193,11 @@ func VerifySignature(bsc SignedCommitment, totalLeavesCount uint64, merkleRoot S
 	if err != nil {
 		return err
 	}
-	log.Printf("cal merkle root: %#x", calMerkleRoot)
-	log.Printf("expected merkle root: %#x", merkleRoot)
+	log.Printf("beefy-go::VerifySignature -> cal merkle root: %#x", calMerkleRoot)
+	log.Printf("beefy-go::VerifySignature -> expected merkle root: %#x", merkleRoot)
 
 	valid, err := authoritiesProof.Verify(merkleRoot[:])
-	log.Printf("verified result : %#v", valid)
+	log.Printf("beefy-go::VerifySignature -> verified result : %#v", valid)
 	if err != nil || !valid {
 		return err
 	}
