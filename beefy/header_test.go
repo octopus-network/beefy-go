@@ -785,7 +785,7 @@ func TestBuildAndVerifyParaHeaderProofLocal3(t *testing.T) {
 				t.Logf("targetLeafHeaderRehash: %#x", leafHeaderRehash)
 				t.Logf("\nleafIndex: %d mmrLeaf ParentNumber: %d \n leafHeader: %+v", leafIndex, mmrBatchProof.Leaves[i].ParentNumberAndHash.ParentNumber, targetLeafHeader)
 				t.Logf("\nleafBlockHash: %#x\n mmrLeaf parent Hash: %#x\n targetLeafHeaderRehash: %#x", targetLeafBlockHash, mmrBatchProof.Leaves[i].ParentNumberAndHash.Hash, leafHeaderRehash)
-				// TODO: save the targetParaHeader for  veify state proof
+				// TODO: mock to save the targetParaHeader for  veify state proof
 			}
 
 			// verify parachain header proof use the beefy mmrLeaf.ParachainHeads

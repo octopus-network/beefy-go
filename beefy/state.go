@@ -10,7 +10,7 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/xxhash"
-	trie_proof "github.com/octopus-network/trie-go/trie/proof"
+	tproof "github.com/octopus-network/trie-go/trie/proof"
 )
 
 // CreateStorageKeyPrefix creates a key prefix for keys of a map.
@@ -140,13 +140,8 @@ func GetTimestampProof(conn *gsrpc.SubstrateAPI, blockHash types.Hash) (ReadProo
 // verify state proof
 // Note: The value must be scale encoded
 func VerifyStateProof(stateProof [][]byte, stateRoot []byte, key []byte, value []byte) error {
-	//TODO: need marshal?
-	// encodedValue, err := trie_scale.Marshal(value)
-	// if err != nil {
-	// 	return false, err
-	// }
 
-	err := trie_proof.Verify(stateProof, stateRoot, key, value)
+	err := tproof.Verify(stateProof, stateRoot, key, value)
 
 	if err != nil {
 		return err
